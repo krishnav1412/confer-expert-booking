@@ -1,0 +1,57 @@
+# Render Blueprint — one-click deploy for the Confer backend.
+# https://render.com/docs/blueprint-spec
+#
+# Usage:
+#   1. Push this repo to GitHub.
+#   2. In Render → New + → Blueprint → connect repo.
+#   3. Render reads this file, creates the service, and prompts for env vars.
+
+services:
+  - type: web
+    name: confer-api
+    runtime: node
+    rootDir: backend
+    plan: starter           # bump to standard+ for production traffic
+    branch: main
+    healthCheckPath: /api/health
+    buildCommand: npm ci
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: MONGO_URI
+        sync: false         # set manually in dashboard
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: BCRYPT_ROUNDS
+        value: 10
+      - key: CLIENT_URL
+        sync: false         # e.g. https://confer.vercel.app
+      - key: PUBLIC_APP_URL
+        sync: false         # same as CLIENT_URL for single-frontend
+      # Email (optional — defaults to console adapter)
+      - key: EMAIL_PROVIDER
+        value: console
+      - key: EMAIL_FROM
+        value: Confer <no-reply@confer.app>
+      # Payments (optional — defaults to mock)
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      # Storage (defaults to local — use cloudinary for multi-instance)
+      - key: STORAGE_PROVIDER
+        value: local
+      - key: UPLOAD_ROOT
+        value: /app/uploads
+    disk:
+      name: confer-uploads
+      mountPath: /app/uploads
+      sizeGB: 1            # only needed if STORAGE_PROVIDER=local
