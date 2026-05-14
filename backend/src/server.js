@@ -3,6 +3,7 @@ import http from 'http';
 import app from './app.js';
 import connectDB from './config/db.js';
 import { initSocket } from './socket/socket.js';
+import { startSubscriptionScheduler } from './services/subscriptionScheduler.js';
 
 const PORT = parseInt(process.env.PORT, 10) || 5000;
 
@@ -11,6 +12,7 @@ const start = async () => {
 
   const server = http.createServer(app);
   initSocket(server);
+  const scheduler = startSubscriptionScheduler();
 
   server.listen(PORT, () => {
     console.log(`[server] Listening on port ${PORT} (${process.env.NODE_ENV || 'development'})`);
@@ -18,6 +20,7 @@ const start = async () => {
 
   const shutdown = (signal) => {
     console.log(`\n[server] ${signal} received, shutting down gracefully`);
+    scheduler.stop();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(1), 10_000).unref();
   };

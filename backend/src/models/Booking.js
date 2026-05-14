@@ -29,6 +29,18 @@ const bookingSchema = new mongoose.Schema(
     servicePrice: { type: Number, default: 0 },
     serviceDuration: { type: Number, default: 60 },
 
+    // Package/subscription linkage. Optional for backward compatibility:
+    // existing and new one-off bookings remain plain single sessions.
+    bookingType: {
+      type: String,
+      enum: ['single', 'program', 'subscription'],
+      default: 'single',
+      index: true,
+    },
+    programId: { type: mongoose.Schema.Types.ObjectId, ref: 'Program', default: null, index: true },
+    subscriptionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Subscription', default: null, index: true },
+    sequenceNumber: { type: Number, default: null, min: 1 },
+
     // Booking lifecycle
     status: {
       type: String,
@@ -48,6 +60,7 @@ const bookingSchema = new mongoose.Schema(
     cancelledAt: { type: Date, default: null },
     completedAt: { type: Date, default: null },
     reviewedAt: { type: Date, default: null },
+    reminderSentAt: { type: Date, default: null, index: true },
 
     // Video session foundation
     meetingProvider: {
@@ -81,6 +94,9 @@ bookingSchema.index(
 // Hot-path indexes
 bookingSchema.index({ userId: 1, status: 1 });
 bookingSchema.index({ expertId: 1, status: 1, date: 1 });
+bookingSchema.index({ programId: 1, status: 1 });
+bookingSchema.index({ subscriptionId: 1, status: 1 });
+bookingSchema.index({ reminderSentAt: 1, date: 1, status: 1 });
 
 const Booking = mongoose.model('Booking', bookingSchema);
 export default Booking;

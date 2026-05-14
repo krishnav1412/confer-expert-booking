@@ -6,6 +6,8 @@ import toast from 'react-hot-toast';
 
 import { fetchMyExpertProfile, fetchMyAnalytics } from '../api/experts';
 import { fetchExpertBookings, updateBookingStatus } from '../api/bookings';
+import { fetchMyPrograms } from '../api/programs';
+import { fetchMySubscriptions } from '../api/subscriptions';
 import { listConversations } from '../api/messages';
 import { createPromotion, verifyPayment } from '../api/payments';
 import { useAuth } from '../context/AuthContext';
@@ -57,6 +59,16 @@ const ExpertDashboardPage = () => {
     queryFn: () => listConversations('expert'),
   });
 
+  const { data: programs = [] } = useQuery({
+    queryKey: ['programs', 'me'],
+    queryFn: fetchMyPrograms,
+  });
+
+  const { data: subscriptions = [] } = useQuery({
+    queryKey: ['subscriptions', 'me'],
+    queryFn: fetchMySubscriptions,
+  });
+
   const today = new Date().toISOString().split('T')[0];
   const stats = useMemo(() => {
     const list = bookings || [];
@@ -65,6 +77,26 @@ const ExpertDashboardPage = () => {
     const pending = list.filter((b) => b.status === 'Pending');
     return { upcoming, completed, pending, all: list };
   }, [bookings, today]);
+
+  const learningStats = useMemo(() => {
+    const expertPrograms = (programs || []).filter((p) => sameId(p.expertId, expert?._id));
+    const expertSubscriptions = (subscriptions || []).filter((s) => sameId(s.expertId, expert?._id));
+    const activePrograms = expertPrograms.filter((p) => p.status === 'active');
+    const activeSubscriptions = expertSubscriptions.filter((s) => s.status === 'active');
+    const upcomingSubscriptionSessions = activeSubscriptions.reduce(
+      (acc, subscription) => acc + (subscription.generatedBookingIds || [])
+        .filter((b) => b.date >= today && b.status !== 'Cancelled' && b.status !== 'Completed').length,
+      0
+    );
+    return {
+      activePrograms,
+      activeSubscriptions,
+      pausedSubscriptions: expertSubscriptions.filter((s) => s.status === 'paused'),
+      upcomingSubscriptionSessions,
+      programStudents: new Set(activePrograms.map((p) => String(p.userId?._id || p.userId))).size,
+      activeSubscribers: new Set(activeSubscriptions.map((s) => String(s.userId?._id || s.userId))).size,
+    };
+  }, [programs, subscriptions, expert?._id, today]);
 
   const visibleBookings =
     tab === 'upcoming' ? stats.upcoming :
@@ -137,6 +169,8 @@ const ExpertDashboardPage = () => {
         />
         <KpiCard icon={CalendarIcon} label="Upcoming" value={stats.upcoming.length} />
         <KpiCard icon={UsersIcon} label="Unique clients" value={analytics?.uniqueClients || 0} />
+        <KpiCard icon={UsersIcon} label="Subscribers" value={learningStats.activeSubscribers} hint={`${learningStats.upcomingSubscriptionSessions} subscription sessions`} />
+        <KpiCard icon={CheckCircleIcon} label="Program students" value={learningStats.programStudents} hint={`${learningStats.activePrograms.length} active programs`} />
         <KpiCard icon={StarIcon} label="Rating" value={expert.rating?.toFixed(1) || '—'} hint={`${expert.stats?.profileViews || 0} profile views`} />
       </div>
 
@@ -246,6 +280,19 @@ const ExpertDashboardPage = () => {
                 </>
               )}
             </div>
+          </div>
+
+          <div className="card p-6">
+            <div className="flex items-center gap-2">
+              <UsersIcon className="h-4 w-4 text-ink-500 dark:text-ink-400" />
+              <h3 className="font-display text-base font-semibold text-ink-900 dark:text-white">Programs & subscriptions</h3>
+            </div>
+            <dl className="mt-4 space-y-3 text-sm">
+              <Stat label="Active subscribers" value={learningStats.activeSubscribers} />
+              <Stat label="Paused subscriptions" value={learningStats.pausedSubscriptions.length} />
+              <Stat label="Program students" value={learningStats.programStudents} />
+              <Stat label="Upcoming recurring sessions" value={learningStats.upcomingSubscriptionSessions} />
+            </dl>
           </div>
 
           {/* Inbox preview */}
@@ -374,5 +421,7 @@ const BookingRow = ({ booking, onStatusChange }) => {
     </div>
   );
 };
+
+const sameId = (value, target) => String(value?._id || value || '') === String(target || '');
 
 export default ExpertDashboardPage;

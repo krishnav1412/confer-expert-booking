@@ -24,15 +24,53 @@ export const statusUpdateSchema = z.object({
   status: z.enum(['Pending', 'Confirmed', 'Completed', 'Cancelled']),
 });
 
-// POST /api/bookings (auth required)
-export const createBooking = asyncHandler(async (req, res) => {
-  const { expertId, serviceId, phone, date, timeSlot, notes, timezone } = req.body;
+export const resolveServiceSnapshot = (expert, serviceId) => {
+  let serviceIdForBooking = null;
+  let serviceName = 'Session';
+  let serviceDescription = '';
+  let servicePrice = expert.price;
+  let serviceDuration = 60;
 
+  if (serviceId && expert.services?.length) {
+    const service = expert.services.id(serviceId);
+    if (!service || service.active === false) throw new ApiError(400, 'Selected service not available');
+    serviceIdForBooking = service._id;
+    serviceName = service.name;
+    serviceDescription = service.description || '';
+    servicePrice = service.price;
+    serviceDuration = service.durationMinutes;
+  } else if (expert.services?.length) {
+    const cheapest = [...expert.services].filter((s) => s.active !== false).sort((a, b) => a.price - b.price)[0];
+    if (cheapest) {
+      serviceIdForBooking = cheapest._id;
+      serviceName = cheapest.name;
+      serviceDescription = cheapest.description || '';
+      servicePrice = cheapest.price;
+      serviceDuration = cheapest.durationMinutes;
+    }
+  }
+
+  return {
+    serviceId: serviceIdForBooking,
+    serviceName,
+    serviceDescription,
+    servicePrice,
+    serviceDuration,
+  };
+};
+
+export const createBookingForUser = async ({
+  user,
+  payload,
+  bookingMeta = {},
+  serviceSnapshotOverride = null,
+}) => {
+  const { expertId, serviceId, phone, date, timeSlot, notes, timezone } = payload;
   const expert = await Expert.findById(expertId);
   if (!expert) throw new ApiError(404, 'Expert not found');
 
   // Cannot book yourself
-  if (String(expert.userId) === String(req.user._id)) {
+  if (String(expert.userId) === String(user._id)) {
     throw new ApiError(400, 'You cannot book your own profile');
   }
 
@@ -52,27 +90,13 @@ export const createBooking = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'This slot is within the expert\'s booking buffer window');
   }
 
-  // Resolve service snapshot
-  let serviceName = 'Session';
-  let servicePrice = expert.price;
-  let serviceDuration = 60;
-  let resolvedServiceId = null;
-  if (serviceId && expert.services?.length) {
-    const service = expert.services.id(serviceId);
-    if (!service || service.active === false) throw new ApiError(400, 'Selected service not available');
-    resolvedServiceId = service._id;
-    serviceName = service.name;
-    servicePrice = service.price;
-    serviceDuration = service.durationMinutes;
-  } else if (expert.services?.length) {
-    const cheapest = [...expert.services].filter((s) => s.active !== false).sort((a, b) => a.price - b.price)[0];
-    if (cheapest) {
-      resolvedServiceId = cheapest._id;
-      serviceName = cheapest.name;
-      servicePrice = cheapest.price;
-      serviceDuration = cheapest.durationMinutes;
-    }
-  }
+  const serviceSnapshot = serviceSnapshotOverride || resolveServiceSnapshot(expert, serviceId);
+  const {
+    serviceId: resolvedServiceId,
+    serviceName,
+    servicePrice,
+    serviceDuration,
+  } = serviceSnapshot;
 
   // Pre-check concurrent collision
   const existing = await Booking.findOne({ expertId, date, timeSlot, status: { $ne: 'Cancelled' } });
@@ -81,19 +105,23 @@ export const createBooking = asyncHandler(async (req, res) => {
   let booking;
   try {
     booking = await Booking.create({
-      userId: req.user._id,
+      userId: user._id,
       expertId,
-      name: req.user.name,
-      email: req.user.email,
+      name: user.name,
+      email: user.email,
       phone,
       date,
       timeSlot,
-      timezone: timezone || req.user.timezone || 'Asia/Kolkata',
+      timezone: timezone || user.timezone || 'Asia/Kolkata',
       notes,
       serviceId: resolvedServiceId,
       serviceName,
       servicePrice,
       serviceDuration,
+      bookingType: bookingMeta.bookingType || 'single',
+      programId: bookingMeta.programId || null,
+      subscriptionId: bookingMeta.subscriptionId || null,
+      sequenceNumber: bookingMeta.sequenceNumber || null,
       status: 'Confirmed',
       paymentStatus: servicePrice > 0 ? 'pending' : 'paid', // 0-cost goes through
     });
@@ -112,7 +140,7 @@ export const createBooking = asyncHandler(async (req, res) => {
 
   // Notifications
   await createNotification({
-    userId: req.user._id,
+    userId: user._id,
     type: 'booking_created',
     title: `Session booked with ${expert.name}`,
     body: `${serviceName} on ${date} at ${timeSlot}`,
@@ -122,14 +150,24 @@ export const createBooking = asyncHandler(async (req, res) => {
   await createNotification({
     userId: expert.userId,
     type: 'booking_created',
-    title: `New booking from ${req.user.name}`,
+    title: `New booking from ${user.name}`,
     body: `${serviceName} on ${date} at ${timeSlot}`,
     actionUrl: '/expert-dashboard',
     metadata: { bookingId: String(booking._id) },
   });
 
   // Fire-and-forget transactional email
-  emailService.sendBookingConfirmedEmail(req.user, booking);
+  emailService.sendBookingConfirmedEmail(user, booking);
+
+  return booking;
+};
+
+// POST /api/bookings (auth required)
+export const createBooking = asyncHandler(async (req, res) => {
+  const booking = await createBookingForUser({
+    user: req.user,
+    payload: req.body,
+  });
 
   res.status(201).json({
     success: true,

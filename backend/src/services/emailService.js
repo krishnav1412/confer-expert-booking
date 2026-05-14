@@ -123,6 +123,23 @@ export const sendBookingCancelledEmail = (user, booking) =>
     ),
   });
 
+export const sendBookingReminderEmail = (user, booking, expert) =>
+  safeSend({
+    to: user.email || booking.email,
+    subject: `Reminder: ${booking.serviceName} starts in 1 hour`,
+    html: wrap(
+      'Your session starts soon',
+      `<p>Hi ${user.name || booking.name},</p>
+       <p>This is a quick reminder that your session with <strong>${expert?.name || 'your expert'}</strong> starts in about 1 hour.</p>
+       <p><strong>Date:</strong> ${booking.date}<br>
+       <strong>Time:</strong> ${booking.timeSlot}<br>
+       <strong>Duration:</strong> ${booking.serviceDuration || 60} minutes<br>
+       <strong>Expert:</strong> ${expert?.name || 'Expert'}</p>
+       <p>You can review the details from your dashboard.</p>`,
+      { url: `${process.env.PUBLIC_APP_URL || ''}/dashboard`, label: 'View booking' }
+    ),
+  });
+
 export const sendExpertApprovedEmail = (user) =>
   safeSend({
     to: user.email,
@@ -164,6 +181,7 @@ export default {
   sendWelcomeEmail,
   sendBookingConfirmedEmail,
   sendBookingCancelledEmail,
+  sendBookingReminderEmail,
   sendExpertApprovedEmail,
   sendExpertRejectedEmail,
   sendPasswordResetEmail,

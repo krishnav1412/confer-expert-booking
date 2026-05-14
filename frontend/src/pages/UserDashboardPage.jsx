@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 
 import { fetchMyBookings } from '../api/bookings';
+import { fetchMyPrograms } from '../api/programs';
+import { fetchMySubscriptions } from '../api/subscriptions';
 import { listFavorites } from '../api/users';
 import { useAuth } from '../context/AuthContext';
 import Avatar from '../components/Avatar';
@@ -33,6 +35,16 @@ const UserDashboardPage = () => {
     queryFn: fetchMyBookings,
   });
 
+  const { data: programs = [], isLoading: programsLoading } = useQuery({
+    queryKey: ['programs', 'me'],
+    queryFn: fetchMyPrograms,
+  });
+
+  const { data: subscriptions = [], isLoading: subscriptionsLoading } = useQuery({
+    queryKey: ['subscriptions', 'me'],
+    queryFn: fetchMySubscriptions,
+  });
+
   const { data: favorites = [] } = useQuery({
     queryKey: ['favorites', 'me'],
     queryFn: listFavorites,
@@ -50,10 +62,22 @@ const UserDashboardPage = () => {
     return { upcoming: upc, completed: comp, all: list, totalSpend: spend };
   }, [bookings, today]);
 
+  const myPrograms = useMemo(
+    () => (programs || []).filter((p) => sameId(p.userId, user?._id)),
+    [programs, user?._id]
+  );
+
+  const mySubscriptions = useMemo(
+    () => (subscriptions || []).filter((s) => sameId(s.userId, user?._id)),
+    [subscriptions, user?._id]
+  );
+
   const visibleList =
     tab === 'upcoming' ? upcoming :
     tab === 'completed' ? completed :
     tab === 'favorites' ? null :
+    tab === 'programs' ? null :
+    tab === 'subscriptions' ? null :
     all;
 
   return (
@@ -80,6 +104,8 @@ const UserDashboardPage = () => {
             { id: 'upcoming', label: 'Upcoming', count: upcoming.length },
             { id: 'completed', label: 'Completed', count: completed.length },
             { id: 'all', label: 'All bookings', count: all.length },
+            { id: 'programs', label: 'My Programs', count: myPrograms.length },
+            { id: 'subscriptions', label: 'My Subscriptions', count: mySubscriptions.length },
             { id: 'favorites', label: 'Favorites', count: favorites.length },
           ].map((t) => (
             <button
@@ -127,6 +153,38 @@ const UserDashboardPage = () => {
                     {formatPrice(expert.price)}
                   </div>
                 </Link>
+              ))}
+            </div>
+          )
+        ) : tab === 'programs' ? (
+          programsLoading ? (
+            <RowSkeleton rows={3} />
+          ) : myPrograms.length === 0 ? (
+            <EmptyState
+              icon={TrendingIcon}
+              title="No programs yet"
+              description="Start a package from an expert profile to track progress here."
+              action={<Link to="/" className="btn-primary">Browse experts</Link>}
+            />
+          ) : (
+            <div className="space-y-3">
+              {myPrograms.map((program) => <ProgramRow key={program._id} program={program} />)}
+            </div>
+          )
+        ) : tab === 'subscriptions' ? (
+          subscriptionsLoading ? (
+            <RowSkeleton rows={3} />
+          ) : mySubscriptions.length === 0 ? (
+            <EmptyState
+              icon={CalendarIcon}
+              title="No subscriptions yet"
+              description="Subscribe from an expert profile to keep recurring sessions organized."
+              action={<Link to="/" className="btn-primary">Browse experts</Link>}
+            />
+          ) : (
+            <div className="space-y-3">
+              {mySubscriptions.map((subscription) => (
+                <SubscriptionRow key={subscription._id} subscription={subscription} />
               ))}
             </div>
           )
@@ -222,5 +280,117 @@ const BookingRow = ({ booking, onReview }) => {
     </div>
   );
 };
+
+const ProgramRow = ({ program }) => {
+  const expert = program.expertId || {};
+  const nextSession = getNextSession(program.bookingIds);
+  const progress = program.progress?.percent || 0;
+  return (
+    <div className="card p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <Avatar src={expert.profileImage} name={expert.name} size="lg" />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h3 className="text-base font-semibold text-ink-900 dark:text-white">{program.title}</h3>
+            <StatusPill status={program.status} />
+          </div>
+          <div className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+            {expert.name || 'Expert'}{expert.category && ` · ${expert.category}`}
+          </div>
+          <div className="mt-3">
+            <div className="flex items-center justify-between text-xs text-ink-500 dark:text-ink-400">
+              <span>{program.progress?.completedSessions || 0} of {program.totalSessions} sessions completed</span>
+              <span>{progress}%</span>
+            </div>
+            <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-ink-100 dark:bg-ink-800">
+              <div className="h-full rounded-full bg-emerald-500" style={{ width: `${progress}%` }} />
+            </div>
+          </div>
+          <NextSessionLine session={nextSession} />
+        </div>
+        <div className="shrink-0 text-sm font-semibold text-ink-900 dark:text-white">
+          {formatPrice(program.packageSnapshot?.price || 0)}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const SubscriptionRow = ({ subscription }) => {
+  const expert = subscription.expertId || {};
+  const nextSession = getNextSession(subscription.generatedBookingIds);
+  return (
+    <div className="card p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <Avatar src={expert.profileImage} name={expert.name} size="lg" />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h3 className="text-base font-semibold text-ink-900 dark:text-white">
+              {subscription.serviceSnapshot?.name || 'Subscription'}
+            </h3>
+            <StatusPill status={subscription.status} />
+          </div>
+          <div className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+            {expert.name || 'Expert'} · {formatPlan(subscription.plan)}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-ink-500 dark:text-ink-400">
+            <span className="inline-flex items-center gap-1.5">
+              <CalendarIcon className="h-4 w-4" />
+              Renews {formatDate(subscription.renewalDate)}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <ClockIcon className="h-4 w-4" />
+              {formatRecurringDays(subscription.recurringDays)} at {subscription.sessionTime}
+            </span>
+          </div>
+          <NextSessionLine session={nextSession} />
+        </div>
+        <div className="shrink-0 text-sm font-semibold text-ink-900 dark:text-white">
+          {formatPrice(subscription.serviceSnapshot?.price || 0)}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const NextSessionLine = ({ session }) => {
+  if (!session) {
+    return <div className="mt-2 text-sm text-ink-500 dark:text-ink-400">No upcoming sessions scheduled yet.</div>;
+  }
+  return (
+    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-ink-500 dark:text-ink-400">
+      <span className="inline-flex items-center gap-1.5">
+        <CalendarIcon className="h-4 w-4" />
+        Next: {formatDate(session.date)}
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <ClockIcon className="h-4 w-4" />
+        {session.timeSlot} · {formatDuration(session.serviceDuration)}
+      </span>
+    </div>
+  );
+};
+
+const StatusPill = ({ status }) => (
+  <span className="inline-flex rounded-full bg-ink-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-ink-600 dark:bg-ink-800 dark:text-ink-300">
+    {status}
+  </span>
+);
+
+const sameId = (value, target) => String(value?._id || value || '') === String(target || '');
+
+const getNextSession = (sessions = []) => {
+  const today = new Date().toISOString().split('T')[0];
+  return [...(sessions || [])]
+    .filter((s) => s.date >= today && s.status !== 'Cancelled' && s.status !== 'Completed')
+    .sort((a, b) => `${a.date} ${a.timeSlot}`.localeCompare(`${b.date} ${b.timeSlot}`))[0] || null;
+};
+
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+const formatRecurringDays = (days = []) =>
+  days.map((day) => DAY_NAMES[day]).filter(Boolean).join(' ') || 'Recurring';
+
+const formatPlan = (plan) => plan === 'yearly' ? 'Yearly' : 'Monthly';
 
 export default UserDashboardPage;

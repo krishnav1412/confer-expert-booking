@@ -5,6 +5,8 @@ import clsx from 'clsx';
 import toast from 'react-hot-toast';
 
 import { fetchExpertById } from '../api/experts';
+import { createProgram } from '../api/programs';
+import { createSubscription } from '../api/subscriptions';
 import { toggleFavorite, trackView } from '../api/users';
 import { getSocket } from '../sockets/socket';
 import { useAuth } from '../context/AuthContext';
@@ -33,6 +35,7 @@ const ExpertDetailPage = () => {
   const [bookingOpen, setBookingOpen] = useState(false);
   const [messageOpen, setMessageOpen] = useState(false);
   const [activeDate, setActiveDate] = useState(null);
+  const [activeOfferTab, setActiveOfferTab] = useState('services');
   const [openFaq, setOpenFaq] = useState(0);
 
   const { data: expert, isLoading, isError, refetch } = useQuery({
@@ -120,6 +123,30 @@ const ExpertDetailPage = () => {
     },
   });
 
+  const programMutation = useMutation({
+    mutationFn: createProgram,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['programs', 'me'] });
+      toast.success('Program added to your dashboard');
+    },
+    onError: (err) => {
+      if (err?.status === 401) toast.error('Sign in to start a program');
+      else toast.error(err.message || 'Could not start program');
+    },
+  });
+
+  const subscriptionMutation = useMutation({
+    mutationFn: createSubscription,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subscriptions', 'me'] });
+      toast.success('Subscription added to your dashboard');
+    },
+    onError: (err) => {
+      if (err?.status === 401) toast.error('Sign in to subscribe');
+      else toast.error(err.message || 'Could not create subscription');
+    },
+  });
+
   if (isLoading) {
     return (
       <div className="container-app py-10">
@@ -147,6 +174,36 @@ const ExpertDetailPage = () => {
     expert.services?.[0] || null;
 
   const activeDay = sortedSlots.find((g) => g.date === activeDate) || sortedSlots[0];
+  const activeServices = (expert.services || []).filter((s) => s.active !== false);
+  const subscriptionCadence = deriveSubscriptionCadence(sortedSlots);
+  const programPackages = activeServices.map((service) => ({
+    id: `${service._id}-program`,
+    service,
+    title: `${service.name} Program`,
+    totalSessions: 3,
+    price: service.price * 3,
+  }));
+  const subscriptionPlans = activeServices.flatMap((service) => {
+    const monthly = service.price * 4;
+    return [
+      {
+        id: `${service._id}-monthly`,
+        service,
+        plan: 'monthly',
+        title: `${service.name} Monthly`,
+        price: monthly,
+        cadence: '/month',
+      },
+      {
+        id: `${service._id}-yearly`,
+        service,
+        plan: 'yearly',
+        title: `${service.name} Yearly`,
+        price: monthly * 10,
+        cadence: '/year',
+      },
+    ];
+  });
 
   const handleBook = () => {
     if (!selectedSlot) return;
@@ -154,6 +211,36 @@ const ExpertDetailPage = () => {
   };
 
   const isOwnProfile = isAuthenticated && user?.expertProfile && String(user.expertProfile?._id || user.expertProfile) === String(expert._id);
+
+  const handleStartProgram = (pkg) => {
+    if (!isAuthenticated) {
+      toast.error('Sign in to start a program');
+      return;
+    }
+    programMutation.mutate({
+      expertId: expert._id,
+      serviceId: pkg.service._id,
+      title: pkg.title,
+      totalSessions: pkg.totalSessions,
+      description: pkg.service.description || '',
+    });
+  };
+
+  const handleStartSubscription = (plan) => {
+    if (!isAuthenticated) {
+      toast.error('Sign in to subscribe');
+      return;
+    }
+    subscriptionMutation.mutate({
+      expertId: expert._id,
+      serviceId: plan.service._id,
+      plan: plan.plan,
+      recurringDays: subscriptionCadence.days,
+      sessionTime: subscriptionCadence.time,
+      timezone: expert.timezone || user?.timezone || 'Asia/Kolkata',
+      autoRenew: true,
+    });
+  };
 
   return (
     <div className="container-app py-10">
@@ -251,46 +338,101 @@ const ExpertDetailPage = () => {
             )}
           </div>
 
-          {/* Services */}
-          {expert.services?.length > 0 && (
+          {/* Offers */}
+          {activeServices.length > 0 && (
             <div className="card p-6">
-              <h2 className="font-display text-lg font-semibold text-ink-900 dark:text-white">Services offered</h2>
-              <p className="mt-0.5 text-sm text-ink-500 dark:text-ink-400">Pick a service. Pricing and duration update on the right.</p>
-              <div className="mt-5 space-y-2.5">
-                {expert.services.filter((s) => s.active !== false).map((service) => {
-                  const isActive = service._id === activeServiceId;
-                  return (
-                    <button key={service._id} type="button" onClick={() => setActiveServiceId(service._id)}
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="font-display text-lg font-semibold text-ink-900 dark:text-white">Ways to work together</h2>
+                  <p className="mt-0.5 text-sm text-ink-500 dark:text-ink-400">Pick a one-off session, a package, or a recurring plan.</p>
+                </div>
+                <div className="inline-flex rounded-lg border border-ink-200 bg-ink-50 p-1 dark:border-ink-800 dark:bg-ink-950">
+                  {[
+                    { id: 'services', label: 'Services' },
+                    { id: 'packages', label: 'Packages' },
+                    { id: 'subscriptions', label: 'Subscriptions' },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setActiveOfferTab(item.id)}
                       className={clsx(
-                        'group w-full rounded-xl border p-4 text-left transition-all',
-                        isActive
-                          ? 'border-ink-900 bg-ink-900/[0.02] dark:border-white dark:bg-white/[0.04]'
-                          : 'border-ink-200 hover:border-ink-300 dark:border-ink-800 dark:hover:border-ink-700'
+                        'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                        activeOfferTab === item.id
+                          ? 'bg-white text-ink-900 shadow-sm dark:bg-ink-800 dark:text-white'
+                          : 'text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white'
                       )}
-                      aria-pressed={isActive}>
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-base font-semibold text-ink-900 dark:text-white">{service.name}</h3>
-                            {isActive && (
-                              <span className="grid h-4 w-4 place-items-center rounded-full bg-ink-900 text-white dark:bg-white dark:text-ink-900">
-                                <CheckIcon className="h-3 w-3" />
-                              </span>
-                            )}
-                          </div>
-                          <p className="mt-1 text-sm leading-relaxed text-ink-500 dark:text-ink-400">{service.description}</p>
-                          <div className="mt-2.5 flex items-center gap-2 text-xs text-ink-500 dark:text-ink-400">
-                            <ClockIcon className="h-3.5 w-3.5" />{formatDuration(service.durationMinutes)}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-display text-lg font-bold text-ink-900 dark:text-white">{formatPrice(service.price)}</div>
-                        </div>
-                      </div>
+                    >
+                      {item.label}
                     </button>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
+
+              {activeOfferTab === 'services' && (
+                <div className="mt-5 space-y-2.5">
+                  {activeServices.map((service) => {
+                    const isActive = service._id === activeServiceId;
+                    return (
+                      <button key={service._id} type="button" onClick={() => setActiveServiceId(service._id)}
+                        className={clsx(
+                          'group w-full rounded-xl border p-4 text-left transition-all',
+                          isActive
+                            ? 'border-ink-900 bg-ink-900/[0.02] dark:border-white dark:bg-white/[0.04]'
+                            : 'border-ink-200 hover:border-ink-300 dark:border-ink-800 dark:hover:border-ink-700'
+                        )}
+                        aria-pressed={isActive}>
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-base font-semibold text-ink-900 dark:text-white">{service.name}</h3>
+                              {isActive && (
+                                <span className="grid h-4 w-4 place-items-center rounded-full bg-ink-900 text-white dark:bg-white dark:text-ink-900">
+                                  <CheckIcon className="h-3 w-3" />
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-1 text-sm leading-relaxed text-ink-500 dark:text-ink-400">{service.description}</p>
+                            <div className="mt-2.5 flex items-center gap-2 text-xs text-ink-500 dark:text-ink-400">
+                              <ClockIcon className="h-3.5 w-3.5" />{formatDuration(service.durationMinutes)}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-display text-lg font-bold text-ink-900 dark:text-white">{formatPrice(service.price)}</div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {activeOfferTab === 'packages' && (
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  {programPackages.map((pkg) => (
+                    <PackageCard
+                      key={pkg.id}
+                      pkg={pkg}
+                      disabled={isOwnProfile || programMutation.isPending}
+                      onStart={() => handleStartProgram(pkg)}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {activeOfferTab === 'subscriptions' && (
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  {subscriptionPlans.map((plan) => (
+                    <SubscriptionCard
+                      key={plan.id}
+                      plan={plan}
+                      cadence={subscriptionCadence}
+                      disabled={isOwnProfile || subscriptionMutation.isPending}
+                      onStart={() => handleStartSubscription(plan)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -535,6 +677,60 @@ const SectionLabel = ({ children }) => (
   <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-500 dark:text-ink-400">{children}</h3>
 );
 
+const PackageCard = ({ pkg, disabled, onStart }) => (
+  <div className="rounded-xl border border-ink-200 p-4 dark:border-ink-800">
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <h3 className="text-base font-semibold text-ink-900 dark:text-white">{pkg.title}</h3>
+        <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">{pkg.service.description}</p>
+      </div>
+      <div className="shrink-0 text-right">
+        <div className="font-display text-lg font-bold text-ink-900 dark:text-white">{formatPrice(pkg.price)}</div>
+        <div className="text-xs text-ink-500 dark:text-ink-400">{pkg.totalSessions} sessions</div>
+      </div>
+    </div>
+    <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-ink-500 dark:text-ink-400">
+      <span className="inline-flex items-center gap-1.5 rounded-md bg-ink-50 px-2 py-1 dark:bg-ink-800">
+        <ClockIcon className="h-3.5 w-3.5" /> {formatDuration(pkg.service.durationMinutes)}
+      </span>
+      <span className="inline-flex items-center gap-1.5 rounded-md bg-ink-50 px-2 py-1 dark:bg-ink-800">
+        <CheckCircleIcon className="h-3.5 w-3.5" /> Progress tracked
+      </span>
+    </div>
+    <button type="button" disabled={disabled} onClick={onStart} className="btn-secondary mt-4 w-full">
+      Start package
+    </button>
+  </div>
+);
+
+const SubscriptionCard = ({ plan, cadence, disabled, onStart }) => (
+  <div className="rounded-xl border border-ink-200 p-4 dark:border-ink-800">
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <h3 className="text-base font-semibold text-ink-900 dark:text-white">{plan.title}</h3>
+        <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+          {cadence.label} at {cadence.time}
+        </p>
+      </div>
+      <div className="shrink-0 text-right">
+        <div className="font-display text-lg font-bold text-ink-900 dark:text-white">{formatPrice(plan.price)}</div>
+        <div className="text-xs text-ink-500 dark:text-ink-400">{plan.cadence}</div>
+      </div>
+    </div>
+    <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-ink-500 dark:text-ink-400">
+      <span className="inline-flex items-center gap-1.5 rounded-md bg-ink-50 px-2 py-1 dark:bg-ink-800">
+        <CalendarIcon className="h-3.5 w-3.5" /> Auto-renew
+      </span>
+      <span className="inline-flex items-center gap-1.5 rounded-md bg-ink-50 px-2 py-1 dark:bg-ink-800">
+        <ClockIcon className="h-3.5 w-3.5" /> {formatDuration(plan.service.durationMinutes)}
+      </span>
+    </div>
+    <button type="button" disabled={disabled} onClick={onStart} className="btn-secondary mt-4 w-full">
+      Subscribe
+    </button>
+  </div>
+);
+
 const StatBlock = ({ icon: Icon, value, label }) => (
   <div className="rounded-lg border border-ink-100 p-3 dark:border-ink-800">
     <div className="flex items-center gap-1.5 text-ink-500 dark:text-ink-400">
@@ -558,5 +754,28 @@ const BackLink = () => (
     Back to experts
   </Link>
 );
+
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+const deriveSubscriptionCadence = (slotGroups = []) => {
+  const openGroups = slotGroups.filter((g) => g.slots?.some((s) => !s.booked));
+  const source = openGroups.length > 0 ? openGroups : slotGroups;
+  const days = [];
+  let time = '09:00 AM';
+
+  source.forEach((group) => {
+    const day = new Date(`${group.date}T00:00:00.000Z`).getUTCDay();
+    if (!days.includes(day)) days.push(day);
+    const openSlot = group.slots?.find((s) => !s.booked) || group.slots?.[0];
+    if (openSlot?.time && time === '09:00 AM') time = openSlot.time;
+  });
+
+  const selected = (days.length > 0 ? days : [1, 3, 5]).slice(0, 3);
+  return {
+    days: selected,
+    time,
+    label: selected.map((d) => DAY_NAMES[d]).join(' '),
+  };
+};
 
 export default ExpertDetailPage;
