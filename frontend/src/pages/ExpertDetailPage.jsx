@@ -365,13 +365,14 @@ const ExpertDetailPage = () => {
                       const slotDateTime = new Date(`${activeDay.date} ${s.time}`);
                       const now = new Date();
                         const isPast =activeDay.date === now.toISOString().split('T')[0] &&slotDateTime.getTime() < now.getTime();
+                        const isWithinBuffer =activeDay.date === now.toISOString().split('T')[0] && slotDateTime.getTime() - now.getTime() <((expert.bookingBufferHours || 0) * 3600 * 1000);
                       const isSelected = selectedSlot && selectedSlot.date === activeDay.date && selectedSlot.time === s.time;
                       return (
-                        <button key={s.time} type="button" disabled={s.booked || isOwnProfile || isPast}
+                        <button key={s.time} type="button" disabled={s.booked || isOwnProfile || isPast || isWithinBuffer}
                           onClick={() => setSelectedSlot({ date: activeDay.date, time: s.time })}
                           className={clsx(
                             'group relative inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2.5 text-sm font-medium transition-all',
-                            (s.booked || isPast)
+                            (s.booked || isPast || isWithinBuffer)
                               ? 'cursor-not-allowed border-ink-200 bg-ink-50 text-ink-400 line-through dark:border-ink-800 dark:bg-ink-900/50 dark:text-ink-600'
                               : isOwnProfile
                               ? 'cursor-not-allowed border-ink-200 bg-ink-50 text-ink-400 dark:border-ink-800 dark:bg-ink-900/50 dark:text-ink-600'
