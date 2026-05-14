@@ -362,13 +362,16 @@ const ExpertDetailPage = () => {
                   </div>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                     {activeDay?.slots.map((s) => {
+                      const slotDateTime = new Date(`${activeDay.date} ${s.time}`);
+                      const now = new Date();
+                        const isPast =activeDay.date === now.toISOString().split('T')[0] &&slotDateTime.getTime() < now.getTime();
                       const isSelected = selectedSlot && selectedSlot.date === activeDay.date && selectedSlot.time === s.time;
                       return (
-                        <button key={s.time} type="button" disabled={s.booked || isOwnProfile}
+                        <button key={s.time} type="button" disabled={s.booked || isOwnProfile || isPast}
                           onClick={() => setSelectedSlot({ date: activeDay.date, time: s.time })}
                           className={clsx(
                             'group relative inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2.5 text-sm font-medium transition-all',
-                            s.booked
+                            (s.booked || isPast)
                               ? 'cursor-not-allowed border-ink-200 bg-ink-50 text-ink-400 line-through dark:border-ink-800 dark:bg-ink-900/50 dark:text-ink-600'
                               : isOwnProfile
                               ? 'cursor-not-allowed border-ink-200 bg-ink-50 text-ink-400 dark:border-ink-800 dark:bg-ink-900/50 dark:text-ink-600'
