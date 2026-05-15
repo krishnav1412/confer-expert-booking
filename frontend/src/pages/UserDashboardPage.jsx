@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 
 import { fetchMyBookings } from '../api/bookings';
@@ -24,6 +25,8 @@ import {
 } from '../components/Icons';
 import ReviewBookingModal from '../components/ReviewBookingModal';
 import { formatDate, formatPrice, formatDuration } from '../utils/format';
+import { SpatialCard, GlowOrb } from '../components/design-system';
+import { Reveal } from '../components/design-system/Motion';
 
 const UserDashboardPage = () => {
   const { user } = useAuth();
@@ -81,17 +84,24 @@ const UserDashboardPage = () => {
     all;
 
   return (
-    <div className="container-app py-12">
-      <div>
-        <h1 className="font-display text-3xl font-bold tracking-tight text-ink-900 dark:text-white">
-          Welcome back, {user?.name?.split(' ')[0]}
-        </h1>
-        <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
-          Everything tied to your account in one place.
-        </p>
-      </div>
+    <motion.div className="relative">
+      <GlowOrb color="purple" size="lg" className="absolute -right-20 top-0 opacity-15" />
+      <div className="container-app relative z-10 py-12">
+      <Reveal className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="ds-caption mb-2">Your command center</p>
+          <h1 className="ds-headline">Welcome back, {user?.name?.split(' ')[0]}</h1>
+          <p className="ds-subtitle mt-2">Everything tied to your account in one place.</p>
+        </div>
+        <Link
+          to="/discover"
+          className="ds-btn-secondary shrink-0 !rounded-full !px-6 !py-2.5 text-sm"
+        >
+          Discover mentors
+        </Link>
+      </Reveal>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard icon={CalendarIcon} label="Upcoming" value={upcoming.length} />
         <StatCard icon={CheckCircleIcon} label="Completed" value={completed.length} />
         <StatCard icon={TrendingIcon} label="Total sessions" value={all.length} />
@@ -99,7 +109,7 @@ const UserDashboardPage = () => {
       </div>
 
       <div className="mt-10 border-b border-ink-200 dark:border-ink-800">
-        <div className="-mb-px flex flex-wrap gap-1">
+        <div className="-mb-[2px] flex flex-wrap gap-2 sm:gap-6">
           {[
             { id: 'upcoming', label: 'Upcoming', count: upcoming.length },
             { id: 'completed', label: 'Completed', count: completed.length },
@@ -113,14 +123,24 @@ const UserDashboardPage = () => {
               type="button"
               onClick={() => setTab(t.id)}
               className={clsx(
-                'border-b-2 px-3 py-2.5 text-sm font-medium transition-colors',
+                'relative border-b-2 px-1 py-3 text-sm font-medium transition-colors',
                 tab === t.id
-                  ? 'border-ink-900 text-ink-900 dark:border-white dark:text-white'
+                  ? 'border-transparent text-ink-900 dark:text-white'
                   : 'border-transparent text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white'
               )}
             >
+              {tab === t.id && (
+                <motion.div
+                  layoutId="activeTabIndicator"
+                  className="absolute -bottom-[2px] left-0 right-0 h-[2px] bg-brand-500 shadow-[0_-2px_10px_rgba(99,102,241,0.5)]"
+                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                />
+              )}
               {t.label}
-              <span className="ml-1.5 inline-flex items-center rounded-full bg-ink-100 px-1.5 py-0.5 text-[11px] font-medium text-ink-600 dark:bg-ink-800 dark:text-ink-300">
+              <span className={clsx(
+                'ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors',
+                tab === t.id ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300' : 'bg-ink-100 text-ink-600 dark:bg-white/5 dark:text-ink-400'
+              )}>
                 {t.count}
               </span>
             </button>
@@ -128,84 +148,94 @@ const UserDashboardPage = () => {
         </div>
       </div>
 
-      <div className="mt-6">
-        {tab === 'favorites' ? (
-          favorites.length === 0 ? (
-            <EmptyState
-              icon={HeartIcon}
-              title="No favorites yet"
-              description="Tap the heart on an expert's profile to save them here."
-              action={<Link to="/" className="btn-primary">Browse experts</Link>}
-            />
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {favorites.map((expert) => (
-                <Link key={expert._id} to={`/experts/${expert._id}`}
-                  className="card flex items-center gap-4 p-4 transition-colors hover:border-ink-300 dark:hover:border-ink-700">
-                  <Avatar src={expert.profileImage} name={expert.name} size="md" />
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium text-ink-900 dark:text-white">{expert.name}</div>
-                    <div className="text-sm text-ink-500 dark:text-ink-400">
-                      {expert.category}{expert.company && ` · ${expert.company}`}
-                    </div>
-                  </div>
-                  <div className="text-sm font-semibold text-ink-900 dark:text-white">
-                    {formatPrice(expert.price)}
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )
-        ) : tab === 'programs' ? (
-          programsLoading ? (
-            <RowSkeleton rows={3} />
-          ) : myPrograms.length === 0 ? (
-            <EmptyState
-              icon={TrendingIcon}
-              title="No programs yet"
-              description="Start a package from an expert profile to track progress here."
-              action={<Link to="/" className="btn-primary">Browse experts</Link>}
-            />
-          ) : (
-            <div className="space-y-3">
-              {myPrograms.map((program) => <ProgramRow key={program._id} program={program} />)}
-            </div>
-          )
-        ) : tab === 'subscriptions' ? (
-          subscriptionsLoading ? (
-            <RowSkeleton rows={3} />
-          ) : mySubscriptions.length === 0 ? (
-            <EmptyState
-              icon={CalendarIcon}
-              title="No subscriptions yet"
-              description="Subscribe from an expert profile to keep recurring sessions organized."
-              action={<Link to="/" className="btn-primary">Browse experts</Link>}
-            />
-          ) : (
-            <div className="space-y-3">
-              {mySubscriptions.map((subscription) => (
-                <SubscriptionRow key={subscription._id} subscription={subscription} />
-              ))}
-            </div>
-          )
-        ) : isLoading ? (
-          <RowSkeleton rows={3} />
-        ) : visibleList.length === 0 ? (
-          <EmptyState
-            icon={InboxIcon}
-            title={
-              tab === 'upcoming' ? 'No upcoming sessions' :
-              tab === 'completed' ? 'No completed sessions yet' :
-              'No bookings yet'
-            }
-            description="Browse the marketplace to book your first session."
-            action={<Link to="/" className="btn-primary">Browse experts</Link>}
-          />
-        ) : (
-          <div className="space-y-3">
-            {visibleList.map((b) => <BookingRow key={b._id} booking={b} onReview={() => setReviewBooking(b)} />)}
-          </div>
-        )}
+      <div className="mt-8">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={tab}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+          >
+            {tab === 'favorites' ? (
+              favorites.length === 0 ? (
+                <EmptyState
+                  icon={HeartIcon}
+                  title="No favorites yet"
+                  description="Tap the heart on an expert's profile to save them here."
+                  action={<Link to="/" className="btn-primary">Browse experts</Link>}
+                />
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {favorites.map((expert) => (
+                    <Link key={expert._id} to={`/experts/${expert._id}`}
+                      className="card flex items-center gap-4 p-5 transition-colors hover:border-brand-500/50 hover:shadow-glow">
+                      <Avatar src={expert.profileImage} name={expert.name} size="md" />
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold text-ink-900 dark:text-white">{expert.name}</div>
+                        <div className="text-sm text-ink-500 dark:text-ink-400">
+                          {expert.category}{expert.company && ` · ${expert.company}`}
+                        </div>
+                      </div>
+                      <div className="text-sm font-semibold text-ink-900 dark:text-white">
+                        {formatPrice(expert.price)}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )
+            ) : tab === 'programs' ? (
+              programsLoading ? (
+                <RowSkeleton rows={3} />
+              ) : myPrograms.length === 0 ? (
+                <EmptyState
+                  icon={TrendingIcon}
+                  title="No programs yet"
+                  description="Start a package from an expert profile to track progress here."
+                  action={<Link to="/" className="btn-primary">Browse experts</Link>}
+                />
+              ) : (
+                <div className="space-y-4">
+                  {myPrograms.map((program) => <ProgramRow key={program._id} program={program} />)}
+                </div>
+              )
+            ) : tab === 'subscriptions' ? (
+              subscriptionsLoading ? (
+                <RowSkeleton rows={3} />
+              ) : mySubscriptions.length === 0 ? (
+                <EmptyState
+                  icon={CalendarIcon}
+                  title="No subscriptions yet"
+                  description="Subscribe from an expert profile to keep recurring sessions organized."
+                  action={<Link to="/" className="btn-primary">Browse experts</Link>}
+                />
+              ) : (
+                <div className="space-y-4">
+                  {mySubscriptions.map((subscription) => (
+                    <SubscriptionRow key={subscription._id} subscription={subscription} />
+                  ))}
+                </div>
+              )
+            ) : isLoading ? (
+              <RowSkeleton rows={3} />
+            ) : visibleList.length === 0 ? (
+              <EmptyState
+                icon={InboxIcon}
+                title={
+                  tab === 'upcoming' ? 'No upcoming sessions' :
+                  tab === 'completed' ? 'No completed sessions yet' :
+                  'No bookings yet'
+                }
+                description="Browse the marketplace to book your first session."
+                action={<Link to="/" className="btn-primary">Browse experts</Link>}
+              />
+            ) : (
+              <div className="space-y-4">
+                {visibleList.map((b) => <BookingRow key={b._id} booking={b} onReview={() => setReviewBooking(b)} />)}
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       <ReviewBookingModal
@@ -213,25 +243,31 @@ const UserDashboardPage = () => {
         onClose={() => setReviewBooking(null)}
         booking={reviewBooking}
       />
-    </div>
+      </div>
+    </motion.div>
   );
 };
 
 const StatCard = ({ icon: Icon, label, value }) => (
-  <div className="card p-5">
-    <div className="flex items-center gap-2 text-ink-500 dark:text-ink-400">
-      <Icon className="h-4 w-4" />
-      <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
+  <SpatialCard glow className="relative overflow-hidden p-6 group" padding={false}>
+    <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+      <Icon className="h-20 w-20 text-brand-500" />
     </div>
-    <div className="mt-3 font-display text-2xl font-bold text-ink-900 dark:text-white">{value}</div>
-  </div>
+    <div className="flex items-center gap-3 text-ink-500 dark:text-ink-400">
+      <div className="h-8 w-8 rounded-lg bg-ink-100 dark:bg-white/5 flex items-center justify-center">
+        <Icon className="h-4 w-4 text-brand-600 dark:text-brand-400" />
+      </div>
+      <span className="text-xs font-semibold uppercase tracking-widest">{label}</span>
+    </div>
+    <div className="mt-4 font-display text-3xl font-bold text-ink-900 dark:text-white">{value}</div>
+  </SpatialCard>
 );
 
 const BookingRow = ({ booking, onReview }) => {
   const expert = booking.expertId || {};
   const canReview = booking.status === 'Completed';
   return (
-    <div className="card flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
+    <SpatialCard className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center" padding={false} glow>
       <Avatar src={expert.profileImage} name={expert.name} size="lg" />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -277,14 +313,19 @@ const BookingRow = ({ booking, onReview }) => {
           )}
         </div>
       </div>
-    </div>
+    </SpatialCard>
   );
 };
 
 const ProgramRow = ({ program }) => {
   const expert = program.expertId || {};
   const nextSession = getNextSession(program.bookingIds);
-  const progress = program.progress?.percent || 0;
+  const completedSessions = program.progress?.completedSessions || 0;
+  const isCompleted = completedSessions >= program.totalSessions;
+  const progress = isCompleted ? 100 : (program.progress?.percent || 0);
+  const scheduledCount = program.bookingIds?.length || 0;
+  const isFullyScheduled = scheduledCount >= program.totalSessions;
+  const remainingSessions = program.totalSessions - completedSessions;
   return (
     <div className="card p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -292,24 +333,41 @@ const ProgramRow = ({ program }) => {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h3 className="text-base font-semibold text-ink-900 dark:text-white">{program.title}</h3>
-            <StatusPill status={program.status} />
+            {isCompleted ? (
+              <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+                Completed
+              </span>
+            ) : (
+              <StatusPill status={program.status} />
+            )}
           </div>
           <div className="mt-1 text-sm text-ink-500 dark:text-ink-400">
             {expert.name || 'Expert'}{expert.category && ` · ${expert.category}`}
           </div>
           <div className="mt-3">
             <div className="flex items-center justify-between text-xs text-ink-500 dark:text-ink-400">
-              <span>{program.progress?.completedSessions || 0} of {program.totalSessions} sessions completed</span>
+              <span>{completedSessions} of {program.totalSessions} sessions completed · {remainingSessions} remaining</span>
               <span>{progress}%</span>
             </div>
             <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-ink-100 dark:bg-ink-800">
-              <div className="h-full rounded-full bg-emerald-500" style={{ width: `${progress}%` }} />
+              <div className="h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${progress}%` }} />
             </div>
           </div>
           <NextSessionLine session={nextSession} />
         </div>
-        <div className="shrink-0 text-sm font-semibold text-ink-900 dark:text-white">
-          {formatPrice(program.packageSnapshot?.price || 0)}
+        <div className="flex shrink-0 flex-col items-end justify-center gap-3 sm:w-48">
+          <div className="text-sm font-semibold text-ink-900 dark:text-white">
+            {formatPrice(program.packageSnapshot?.price || 0)}
+          </div>
+          {!isCompleted && (
+            <Link
+              to={isFullyScheduled ? '#' : `/experts/${expert._id}?scheduleProgram=${program._id}`}
+              onClick={(e) => isFullyScheduled && e.preventDefault()}
+              className={clsx('w-full text-center', isFullyScheduled ? 'btn-secondary opacity-50 cursor-not-allowed' : 'btn-secondary')}
+            >
+              {isFullyScheduled ? 'All sessions scheduled' : 'Schedule next session'}
+            </Link>
+          )}
         </div>
       </div>
     </div>

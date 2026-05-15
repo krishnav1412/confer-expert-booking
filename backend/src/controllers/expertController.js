@@ -143,7 +143,6 @@ export const updateExpertProfileSchema = z.object({
     .optional(),
   services: z.array(serviceUpdateSchema).max(8).optional(),
   timezone: z.string().trim().max(80).optional(),
-  bookingBufferHours: z.coerce.number().min(0).max(168).optional(),
   maxBookingsPerDay: z.coerce.number().min(1).max(50).optional(),
 });
 
@@ -187,7 +186,7 @@ export const updateMyExpertProfile = asyncHandler(async (req, res) => {
   const allowed = [
     'bio', 'company', 'experience', 'skills', 'profileImage',
     'linkedinUrl', 'websiteUrl', 'deliverables', 'faqs', 'timezone',
-    'bookingBufferHours', 'maxBookingsPerDay',
+    'maxBookingsPerDay',
   ];
   allowed.forEach((k) => { if (req.body[k] !== undefined) expert[k] = req.body[k]; });
 

@@ -95,7 +95,6 @@ const expertSchema = new mongoose.Schema(
     availableSlots: { type: [slotGroupSchema], default: [] },
     weeklyTemplate: { type: [weeklyTemplateSchema], default: [] },
     blockedDates: { type: [String], default: [] }, // ['YYYY-MM-DD']
-    bookingBufferHours: { type: Number, default: 12, min: 0 },
     maxBookingsPerDay: { type: Number, default: 8, min: 1 },
   },
   { timestamps: true }

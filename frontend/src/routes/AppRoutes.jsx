@@ -10,6 +10,7 @@ import SignupPage from '../pages/SignupPage';
 import ForgotPasswordPage from '../pages/ForgotPasswordPage';
 import ResetPasswordPage from '../pages/ResetPasswordPage';
 import UserDashboardPage from '../pages/UserDashboardPage';
+import DiscoverPage from '../pages/DiscoverPage';
 import ExpertDashboardPage from '../pages/ExpertDashboardPage';
 import MessagesPage from '../pages/MessagesPage';
 import BecomeExpertPage from '../pages/BecomeExpertPage';
@@ -40,6 +41,7 @@ const AppRoutes = () => (
       {/* Authenticated */}
       <Route element={<ProtectedRoute require="authenticated" />}>
         <Route path="/dashboard" element={<UserDashboardPage />} />
+        <Route path="/discover" element={<DiscoverPage />} />
         <Route path="/messages" element={<MessagesPage />} />
         <Route path="/become-expert" element={<BecomeExpertPage />} />
         <Route path="/settings" element={<SettingsPage />} />

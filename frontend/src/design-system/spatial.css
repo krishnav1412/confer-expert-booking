@@ -1,0 +1,150 @@
+/**
+ * Spatial depth — Raycast-inspired floating surfaces
+ */
+
+@layer components {
+  .ds-spatial-card {
+    @apply relative overflow-hidden rounded-2xl backdrop-blur-2xl transition-all duration-500;
+    background: rgb(var(--ds-bg-elevated) / 0.85);
+    border: 1px solid rgb(var(--ds-glass-border));
+    box-shadow:
+      0 0 0 1px rgb(var(--ds-glass-highlight) / 0.04) inset,
+      0 1px 0 rgb(var(--ds-glass-highlight) / 0.08) inset,
+      0 24px 48px -16px rgb(0 0 0 / 0.5),
+      0 8px 24px -8px rgb(0 0 0 / 0.35);
+  }
+
+  .ds-spatial-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(
+      135deg,
+      rgb(255 255 255 / 0.04) 0%,
+      transparent 38%,
+      transparent 100%
+    );
+    pointer-events: none;
+  }
+
+  .ds-spatial-card:hover {
+    border-color: rgb(var(--ds-glass-highlight) / 0.2);
+    box-shadow:
+      0 0 0 1px rgb(var(--ds-glass-highlight) / 0.06) inset,
+      0 1px 0 rgb(var(--ds-glass-highlight) / 0.1) inset,
+      0 32px 64px -20px rgb(0 0 0 / 0.55),
+      0 0 20px rgb(var(--ds-glow-brand) / 0.06);
+    transform: translateY(-2px);
+  }
+
+  .ds-spatial-glow {
+    box-shadow:
+      0 0 0 1px rgb(var(--ds-neon-indigo) / 0.1),
+      0 0 16px rgb(var(--ds-glow-brand) / 0.1),
+      0 24px 48px -16px rgb(0 0 0 / 0.5),
+      inset 0 1px 0 rgb(var(--ds-glass-highlight) / 0.1);
+  }
+
+  .ds-spatial-float {
+    animation: ds-spatial-float 7s ease-in-out infinite;
+  }
+
+  .ds-edge-light {
+    position: relative;
+  }
+
+  .ds-edge-light::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      160deg,
+      rgb(255 255 255 / 0.12),
+      rgb(var(--ds-neon-indigo) / 0.06) 40%,
+      transparent 60%,
+      rgb(var(--ds-neon-cyan) / 0.04)
+    );
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    opacity: 0.5;
+  }
+
+  .ds-workspace {
+    @apply relative overflow-hidden rounded-3xl backdrop-blur-2xl;
+    background: rgb(var(--ds-glass-bg) / 0.5);
+    border: 1px solid rgb(var(--ds-glass-border));
+    box-shadow:
+      0 32px 80px -24px rgb(0 0 0 / 0.6),
+      inset 0 1px 0 rgb(var(--ds-glass-highlight) / 0.08);
+  }
+
+  .ds-workspace-sidebar {
+    @apply border-r backdrop-blur-xl;
+    border-color: rgb(var(--ds-glass-border));
+    background: rgb(var(--ds-glass-bg) / 0.35);
+  }
+
+  .ds-workspace-active {
+    background: linear-gradient(
+      90deg,
+      rgb(var(--ds-neon-indigo) / 0.06) 0%,
+      rgb(var(--ds-glass-bg) / 0.5) 100%
+    );
+    box-shadow: inset 3px 0 0 rgb(var(--ds-neon-indigo) / 0.7);
+  }
+
+  .ds-light-sweep {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .ds-light-sweep::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 40%;
+    height: 200%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(255 255 255 / 0.03),
+      transparent
+    );
+    transform: rotate(25deg);
+    animation: ds-light-sweep 8s ease-in-out infinite;
+    pointer-events: none;
+  }
+}
+
+@keyframes ds-spatial-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes ds-light-sweep {
+  0%,
+  100% {
+    transform: translateX(-120%) rotate(25deg);
+  }
+  50% {
+    transform: translateX(280%) rotate(25deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-spatial-float,
+  .ds-light-sweep::after {
+    animation: none;
+  }
+}

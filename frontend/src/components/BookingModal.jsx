@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 
 import Modal from './Modal';
 import { createBooking } from '../api/bookings';
+import { createProgram, scheduleProgramSession } from '../api/programs';
 import { createBookingOrder, verifyPayment } from '../api/payments';
 import { useAuth } from '../context/AuthContext';
 import { formatDate, formatPrice, formatDuration } from '../utils/format';
@@ -21,12 +22,67 @@ const schema = z.object({
   notes: z.string().max(500).optional(),
 });
 
-const BookingModal = ({ open, onClose, expert, slot, service }) => {
+const BookingModal = ({ open, onClose, expert, slot, service, pkg, existingProgram }) => {
   const queryClient = useQueryClient();
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [success, setSuccess] = useState(null);
   const [paying, setPaying] = useState(false);
+
+  const programMutation = useMutation({
+    mutationFn: async (values) => {
+      const program = await createProgram({
+        expertId: expert._id,
+        serviceId: pkg.service._id,
+        title: pkg.title,
+        totalSessions: pkg.totalSessions,
+        description: pkg.service.description || '',
+      });
+      const res = await scheduleProgramSession(program._id, 1, {
+        date: slot.date,
+        timeSlot: slot.time,
+        phone: values.phone,
+        notes: values.notes || '',
+      });
+      return res.booking;
+    },
+    onError: (err) => {
+      if (err?.status === 409) {
+        toast.error('This slot was just booked. Please pick another time.');
+        queryClient.invalidateQueries({ queryKey: ['expert', expert?._id] });
+        onClose();
+      } else if (err?.status === 401) {
+        toast.error('Please sign in to book');
+        navigate('/login');
+      } else {
+        toast.error(err?.errors?.[0]?.message || err?.message || 'Could not start program');
+      }
+    },
+  });
+
+  const existingProgramMutation = useMutation({
+    mutationFn: async (values) => {
+      const res = await scheduleProgramSession(existingProgram.id, existingProgram.index, {
+        date: slot.date,
+        timeSlot: slot.time,
+        phone: values.phone,
+        notes: values.notes || '',
+      });
+      return res.booking;
+    },
+    onError: (err) => {
+      if (err?.status === 409) {
+        toast.error('This slot was just booked. Please pick another time.');
+        queryClient.invalidateQueries({ queryKey: ['expert', expert?._id] });
+        onClose();
+      } else if (err?.status === 401) {
+        toast.error('Please sign in to book');
+        navigate('/login');
+      } else {
+        toast.error(err?.errors?.[0]?.message || err?.message || 'Could not schedule session');
+      }
+    },
+  });
 
   const {
     register,
@@ -79,21 +135,29 @@ const BookingModal = ({ open, onClose, expert, slot, service }) => {
 
   const onSubmit = async (values) => {
     try {
-      const booking = await bookingMutation.mutateAsync({
-        expertId: expert._id,
-        serviceId: service?._id,
-        date: slot.date,
-        timeSlot: slot.time,
-        phone: values.phone,
-        notes: values.notes || '',
-      });
+      let booking;
+      if (existingProgram) {
+        booking = await existingProgramMutation.mutateAsync(values);
+      } else if (pkg) {
+        booking = await programMutation.mutateAsync(values);
+      } else {
+        booking = await bookingMutation.mutateAsync({
+          expertId: expert._id,
+          serviceId: service?._id,
+          date: slot.date,
+          timeSlot: slot.time,
+          phone: values.phone,
+          notes: values.notes || '',
+        });
+      }
 
       // Payment flow (mock or razorpay)
       if (booking.paymentStatus === 'paid') {
         setSuccess(booking);
         queryClient.invalidateQueries({ queryKey: ['expert', expert._id] });
         queryClient.invalidateQueries({ queryKey: ['bookings', 'me'] });
-        toast.success('Session booked');
+        if (pkg || existingProgram) queryClient.invalidateQueries({ queryKey: ['programs', 'me'] });
+        toast.success(existingProgram ? `Session ${existingProgram.index} scheduled` : pkg ? 'Program started' : 'Session booked');
         return;
       }
 
@@ -137,6 +201,7 @@ const BookingModal = ({ open, onClose, expert, slot, service }) => {
 
       queryClient.invalidateQueries({ queryKey: ['expert', expert._id] });
       queryClient.invalidateQueries({ queryKey: ['bookings', 'me'] });
+      if (pkg || existingProgram) queryClient.invalidateQueries({ queryKey: ['programs', 'me'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       toast.success('Payment successful');
     } catch (err) {
@@ -158,10 +223,10 @@ const BookingModal = ({ open, onClose, expert, slot, service }) => {
 
           <dl className="mt-6 w-full divide-y divide-ink-100 rounded-lg border border-ink-200 text-left text-sm dark:divide-ink-800 dark:border-ink-800">
             <Row label="Expert" value={expert.name} />
-            <Row label="Service" value={success.serviceName} />
+            <Row label="Service" value={pkg ? pkg.title : success.serviceName} />
             <Row label="Date" value={formatDate(success.date, { weekday: 'long', month: 'long', year: 'numeric' })} />
             <Row label="Time" value={`${success.timeSlot} · ${formatDuration(success.serviceDuration)}`} />
-            <Row label="Amount" value={formatPrice(success.servicePrice)} />
+            <Row label="Amount" value={formatPrice(pkg ? pkg.price : success.servicePrice)} />
             <Row label="Status" value={<span className="text-emerald-600 dark:text-emerald-400">{success.status}</span>} />
           </dl>
           <div className="mt-6 grid w-full gap-2 sm:grid-cols-2">
@@ -176,10 +241,12 @@ const BookingModal = ({ open, onClose, expert, slot, service }) => {
   return (
     <Modal open={open} onClose={onClose} title="Book a session" description={`with ${expert.name}`}>
       <div className="mb-5 rounded-lg border border-ink-100 bg-ink-50/70 px-4 py-3 dark:border-ink-800 dark:bg-ink-800/50">
-        {service && (
+        {(service || pkg || existingProgram) && (
           <div className="mb-2 flex items-center justify-between text-sm">
-            <span className="font-medium text-ink-900 dark:text-white">{service.name}</span>
-            <span className="font-semibold text-ink-900 dark:text-white">{formatPrice(service.price)}</span>
+            <span className="font-medium text-ink-900 dark:text-white">
+              {existingProgram ? `${existingProgram.title} (Session ${existingProgram.index})` : pkg ? pkg.title : service.name}
+            </span>
+            <span className="font-semibold text-ink-900 dark:text-white">{formatPrice(pkg ? pkg.price : service.price)}</span>
           </div>
         )}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-ink-600 dark:text-ink-300">
@@ -190,7 +257,7 @@ const BookingModal = ({ open, onClose, expert, slot, service }) => {
           <span className="inline-flex items-center gap-1.5">
             <ClockIcon className="h-4 w-4 text-ink-500 dark:text-ink-400" />
             {slot.time}
-            {service && <span className="text-ink-500 dark:text-ink-400">· {formatDuration(service.durationMinutes)}</span>}
+            {(service || pkg || existingProgram) && <span className="text-ink-500 dark:text-ink-400">· {pkg ? `${pkg.totalSessions} sessions` : formatDuration(service.durationMinutes)}</span>}
           </span>
         </div>
       </div>
@@ -222,10 +289,10 @@ const BookingModal = ({ open, onClose, expert, slot, service }) => {
 
         <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
-          <button type="submit" disabled={isSubmitting || bookingMutation.isPending || paying} className="btn-primary min-w-[12rem]">
+          <button type="submit" disabled={isSubmitting || bookingMutation.isPending || programMutation?.isPending || existingProgramMutation?.isPending || paying} className="btn-primary min-w-[12rem]">
             {paying ? 'Processing payment…' :
-              (isSubmitting || bookingMutation.isPending) ? 'Confirming...' :
-              `Confirm · ${formatPrice(service?.price || expert.price)}`}
+              (isSubmitting || bookingMutation.isPending || programMutation?.isPending || existingProgramMutation?.isPending) ? 'Confirming...' :
+              `Confirm · ${formatPrice(pkg ? pkg.price : (service?.price || expert.price))}`}
           </button>
         </div>
       </form>

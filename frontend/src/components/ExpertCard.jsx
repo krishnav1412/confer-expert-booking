@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import Avatar from './Avatar';
 import Badge from './Badge';
 import Rating from './Rating';
@@ -12,13 +13,16 @@ const ExpertCard = ({ expert }) => {
       ? Math.min(...expert.services.map((s) => s.price))
       : expert.price;
 
+  const MotionLink = motion(Link);
+
   return (
-    <Link
+    <MotionLink
       to={`/experts/${expert._id}`}
-      className="group card relative flex h-full flex-col p-5 transition-all hover:-translate-y-0.5 hover:shadow-card-hover hover:border-ink-300 dark:hover:border-ink-700"
+      whileHover={{ y: -6, scale: 1.01 }}
+      className="group ds-spatial-card ds-edge-light relative flex h-full flex-col p-6 transition-all hover:shadow-glow hover:border-brand-500/50 dark:hover:border-brand-500/30"
     >
       {expert.featured && (
-        <div className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20">
+        <div className="absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20">
           <AwardIcon className="h-3 w-3" />
           Featured
         </div>
@@ -67,7 +71,7 @@ const ExpertCard = ({ expert }) => {
           </span>
         </div>
       </div>
-    </Link>
+    </MotionLink>
   );
 };
 

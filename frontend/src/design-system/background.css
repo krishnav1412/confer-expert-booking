@@ -1,0 +1,87 @@
+/**
+ * Ambient background animations
+ */
+
+@layer utilities {
+  .ds-bg-base {
+    background-color: rgb(var(--ds-bg-base));
+  }
+
+  .ds-mesh-gradient {
+    background:
+      radial-gradient(ellipse 80% 50% at 20% -10%, rgb(var(--ds-mesh-1)), transparent 55%),
+      radial-gradient(ellipse 60% 40% at 85% 10%, rgb(var(--ds-mesh-2)), transparent 50%),
+      radial-gradient(ellipse 50% 60% at 50% 100%, rgb(var(--ds-mesh-3)), transparent 55%),
+      rgb(var(--ds-bg-base));
+  }
+}
+
+@keyframes ds-ambient-drift {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(2%, -3%) scale(1.05);
+  }
+  66% {
+    transform: translate(-2%, 2%) scale(0.97);
+  }
+}
+
+@keyframes ds-ambient-pulse {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes ds-ambient-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+@keyframes ds-glow-breathe {
+  0%,
+  100% {
+    opacity: 0.25;
+    filter: blur(48px);
+  }
+  50% {
+    opacity: 0.4;
+    filter: blur(56px);
+  }
+}
+
+.animate-ds-ambient-drift {
+  animation: ds-ambient-drift 22s ease-in-out infinite;
+}
+
+.animate-ds-ambient-pulse {
+  animation: ds-ambient-pulse 8s ease-in-out infinite;
+}
+
+.animate-ds-ambient-float {
+  animation: ds-ambient-float 6s ease-in-out infinite;
+}
+
+.animate-ds-glow-breathe {
+  animation: ds-glow-breathe 10s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ds-ambient-drift,
+  .animate-ds-ambient-pulse,
+  .animate-ds-ambient-float,
+  .animate-ds-glow-breathe {
+    animation: none;
+  }
+}

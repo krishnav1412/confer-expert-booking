@@ -1,3 +1,10 @@
+@import './design-system/tokens.css';
+@import './design-system/typography.css';
+@import './design-system/background.css';
+@import './design-system/components.css';
+@import './design-system/spatial.css';
+@import './design-system/cinematic.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,13 +12,13 @@
 @layer base {
   :root {
     --toast-bg: 255 255 255;
-    --toast-fg: 19 22 28;
-    --toast-border: 226 230 237;
+    --toast-fg: 24 24 27;
+    --toast-border: 228 228 231;
   }
   .dark {
-    --toast-bg: 22 25 32;
-    --toast-fg: 245 246 248;
-    --toast-border: 38 42 51;
+    --toast-bg: 10 10 10;
+    --toast-fg: 250 250 250;
+    --toast-border: 39 39 42;
   }
 
   html {
@@ -21,12 +28,14 @@
   }
 
   body {
-    @apply bg-ink-50 text-ink-800 font-sans;
+    @apply font-sans text-ink-800;
+    background-color: rgb(var(--ds-bg-base));
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
 
   .dark body {
-    @apply bg-ink-950 text-ink-100;
+    @apply text-ink-100;
+    background-color: rgb(var(--ds-bg-base));
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -46,38 +55,42 @@
   }
 
   ::selection {
-    @apply bg-brand-200 text-brand-900;
+    @apply bg-brand-500/30 text-white;
   }
 }
 
 @layer components {
+  /* Buttons */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-50 relative overflow-hidden;
   }
   .btn-primary {
-    @apply btn bg-ink-900 text-white hover:bg-ink-800 active:bg-ink-700;
+    @apply btn bg-ink-900 text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0;
   }
   .dark .btn-primary {
-    @apply bg-white text-ink-900 hover:bg-ink-100;
+    @apply bg-white text-ink-950 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_25px_rgba(255,255,255,0.2)] hover:bg-ink-100;
+  }
+  .btn-brand {
+    @apply btn bg-gradient-to-r from-brand-500 to-accent-500 text-white shadow-glow hover:shadow-glow-lg hover:-translate-y-0.5 active:translate-y-0 border border-white/10;
   }
   .btn-secondary {
-    @apply btn border border-ink-200 bg-white text-ink-700 hover:border-ink-300 hover:bg-ink-50;
+    @apply btn border border-ink-200 bg-white text-ink-700 hover:border-ink-300 hover:bg-ink-50 hover:-translate-y-0.5 active:translate-y-0 shadow-sm;
   }
   .dark .btn-secondary {
-    @apply border-ink-700 bg-ink-900 text-ink-200 hover:border-ink-600 hover:bg-ink-800;
+    @apply border-white/10 bg-white/5 text-ink-200 hover:border-white/20 hover:bg-white/10 shadow-none backdrop-blur-md;
   }
   .btn-ghost {
     @apply btn text-ink-600 hover:bg-ink-100 hover:text-ink-900;
   }
   .dark .btn-ghost {
-    @apply text-ink-300 hover:bg-ink-800 hover:text-white;
+    @apply text-ink-400 hover:bg-white/10 hover:text-white;
   }
 
   .input {
-    @apply w-full rounded-lg border border-ink-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 transition-colors focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15;
+    @apply w-full rounded-xl border border-ink-200 bg-white px-4 py-3 text-sm text-ink-900 placeholder:text-ink-400 transition-all focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15 shadow-sm;
   }
   .dark .input {
-    @apply border-ink-700 bg-ink-900 text-white placeholder:text-ink-500 focus:border-brand-400;
+    @apply border-white/10 bg-ink-900/50 backdrop-blur-md text-white placeholder:text-ink-500 focus:border-brand-500 focus:ring-brand-500/20 focus:bg-ink-900;
   }
 
   .label {
@@ -87,15 +100,20 @@
     @apply text-ink-200;
   }
 
+  /* Glass Cards */
   .card {
-    @apply rounded-xl border border-ink-200 bg-white shadow-card transition-all;
+    @apply rounded-2xl border border-ink-200 bg-white shadow-card transition-all duration-300;
   }
   .dark .card {
-    @apply border-ink-800 bg-ink-900;
+    @apply border-white/[0.06] bg-[#0c0c10]/90 backdrop-blur-xl shadow-[0_8px_30px_rgba(0,0,0,0.35)] hover:border-white/10 hover:bg-[#101014];
+  }
+
+  .glass-panel {
+    @apply rounded-2xl border border-white/10 bg-ink-950/80 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.4)];
   }
 
   .badge {
-    @apply inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium;
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide uppercase;
   }
 
   .skeleton {

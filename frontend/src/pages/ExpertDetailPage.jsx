@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 
 import { fetchExpertById } from '../api/experts';
-import { createProgram } from '../api/programs';
+import { createProgram, fetchProgramById } from '../api/programs';
 import { createSubscription } from '../api/subscriptions';
 import { toggleFavorite, trackView } from '../api/users';
 import { getSocket } from '../sockets/socket';
@@ -28,6 +29,8 @@ import { formatDate, formatPrice, formatDuration, groupByDate, formatRelativeTim
 const ExpertDetailPage = () => {
   const { id } = useParams();
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const scheduleProgramId = searchParams.get('scheduleProgram');
   const { user, isAuthenticated } = useAuth();
 
   const [activeServiceId, setActiveServiceId] = useState(null);
@@ -35,14 +38,30 @@ const ExpertDetailPage = () => {
   const [bookingOpen, setBookingOpen] = useState(false);
   const [messageOpen, setMessageOpen] = useState(false);
   const [activeDate, setActiveDate] = useState(null);
-  const [activeOfferTab, setActiveOfferTab] = useState('services');
+  const [activeOfferTab, setActiveOfferTab] = useState(null);
   const [openFaq, setOpenFaq] = useState(0);
+  const [pendingPackage, setPendingPackage] = useState(null);
 
   const { data: expert, isLoading, isError, refetch } = useQuery({
     queryKey: ['expert', id],
     queryFn: () => fetchExpertById(id),
     enabled: !!id,
   });
+
+  const { data: programToSchedule } = useQuery({
+    queryKey: ['program', scheduleProgramId],
+    queryFn: () => fetchProgramById(scheduleProgramId),
+    enabled: !!scheduleProgramId,
+  });
+
+  const nextSessionIndex = useMemo(() => {
+    if (!programToSchedule) return null;
+    const scheduled = programToSchedule.bookingIds.map((b) => b.sequenceNumber);
+    for (let i = 1; i <= programToSchedule.totalSessions; i++) {
+      if (!scheduled.includes(i)) return i;
+    }
+    return null;
+  }, [programToSchedule]);
 
   // Track profile view (auth required, non-blocking)
   useEffect(() => {
@@ -102,12 +121,28 @@ const ExpertDetailPage = () => {
     [expert]
   );
 
+  const visibleSlots = useMemo(
+    () => sortedSlots.filter(dayHasFutureSlot),
+    [sortedSlots]
+  );
+
   useEffect(() => {
-    if (!activeDate && sortedSlots.length > 0) {
-      const first = sortedSlots.find((g) => g.slots.some((s) => !s.booked)) || sortedSlots[0];
+    if (visibleSlots.length === 0) return;
+
+    const stillVisible = visibleSlots.some((g) => g.date === activeDate);
+    if (!activeDate || !stillVisible) {
+      const first =
+        visibleSlots.find((g) => g.slots.some((s) => !s.booked && !isSlotPast(g.date, s.time))) ||
+        visibleSlots[0];
       setActiveDate(first.date);
     }
-  }, [sortedSlots, activeDate]);
+  }, [visibleSlots, activeDate]);
+
+  useEffect(() => {
+    if (selectedSlot && isSlotPast(selectedSlot.date, selectedSlot.time)) {
+      setSelectedSlot(null);
+    }
+  }, [selectedSlot, visibleSlots]);
 
   const isFavorite = isAuthenticated && user?.favoriteExperts?.some((fid) => String(fid) === String(id));
 
@@ -173,7 +208,7 @@ const ExpertDetailPage = () => {
     expert.services?.find((s) => s._id === activeServiceId) ||
     expert.services?.[0] || null;
 
-  const activeDay = sortedSlots.find((g) => g.date === activeDate) || sortedSlots[0];
+  const activeDay = visibleSlots.find((g) => g.date === activeDate) || visibleSlots[0];
   const activeServices = (expert.services || []).filter((s) => s.active !== false);
   const subscriptionCadence = deriveSubscriptionCadence(sortedSlots);
   const programPackages = activeServices.map((service) => ({
@@ -217,13 +252,7 @@ const ExpertDetailPage = () => {
       toast.error('Sign in to start a program');
       return;
     }
-    programMutation.mutate({
-      expertId: expert._id,
-      serviceId: pkg.service._id,
-      title: pkg.title,
-      totalSessions: pkg.totalSessions,
-      description: pkg.service.description || '',
-    });
+    setPendingPackage(pkg);
   };
 
   const handleStartSubscription = (plan) => {
@@ -250,37 +279,42 @@ const ExpertDetailPage = () => {
         {/* Main */}
         <div className="space-y-6 lg:col-span-2">
           {/* Profile */}
-          <div className="card p-6">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-              <Avatar src={expert.profileImage} name={expert.name} size="xl" />
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="card p-6 sm:p-8 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-brand-500/10 blur-3xl rounded-full pointer-events-none" />
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-start relative z-10">
+              <div className="rounded-2xl p-1 bg-gradient-to-br from-brand-500 to-accent-500 shrink-0 shadow-xl">
+                <div className="rounded-xl overflow-hidden bg-white dark:bg-ink-950 p-1">
+                  <Avatar src={expert.profileImage} name={expert.name} size="xl" />
+                </div>
+              </div>
               <div className="flex-1">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h1 className="font-display text-2xl font-bold tracking-tight text-ink-900 dark:text-white">
+                    <h1 className="font-display text-3xl font-bold tracking-tight text-ink-900 dark:text-white">
                       {expert.name}
                     </h1>
-                    {expert.company && <p className="mt-0.5 text-sm text-ink-500 dark:text-ink-400">{expert.company}</p>}
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <Badge variant="brand">{expert.category}</Badge>
+                    {expert.company && <p className="mt-1 text-base text-ink-600 dark:text-ink-300 font-medium">{expert.company}</p>}
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      <Badge variant="brand" className="px-3 py-1 shadow-glow">{expert.category}</Badge>
                       <Rating value={expert.rating} />
                       {expert.reviewCount > 0 && (
-                        <span className="text-sm text-ink-500 dark:text-ink-400">
+                        <span className="text-sm font-medium text-ink-500 dark:text-ink-400">
                           ({expert.reviewCount} review{expert.reviewCount === 1 ? '' : 's'})
                         </span>
                       )}
-                      <span className="text-sm text-ink-500 dark:text-ink-400">· {expert.experience}+ years</span>
+                      <span className="text-sm font-medium text-ink-500 dark:text-ink-400">· {expert.experience}+ years</span>
                     </div>
 
                     {(expert.badges?.length > 0 || expert.featured) && (
-                      <div className="mt-3 flex flex-wrap gap-1.5">
+                      <div className="mt-4 flex flex-wrap gap-2">
                         {expert.featured && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20">
-                            <AwardIcon className="h-3 w-3" /> Featured Expert
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700 ring-1 ring-amber-200 shadow-sm dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20">
+                            <AwardIcon className="h-3.5 w-3.5" /> Featured Expert
                           </span>
                         )}
                         {expert.badges?.filter((b) => b !== 'Featured Expert').map((badge) => (
-                          <span key={badge} className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700 ring-1 ring-brand-200 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-500/20">
-                            <AwardIcon className="h-3 w-3" /> {badge}
+                          <span key={badge} className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-bold text-brand-700 ring-1 ring-brand-200 shadow-sm dark:bg-brand-500/10 dark:text-brand-400 dark:ring-brand-500/20">
+                            <AwardIcon className="h-3.5 w-3.5" /> {badge}
                           </span>
                         ))}
                       </div>
@@ -289,26 +323,31 @@ const ExpertDetailPage = () => {
 
                   <div className="flex items-center gap-2">
                     {!isOwnProfile && (
-                      <button
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
                         type="button"
                         onClick={() => favoriteMutation.mutate()}
                         className={clsx(
-                          'grid h-9 w-9 place-items-center rounded-md border transition-colors',
+                          'grid h-10 w-10 place-items-center rounded-xl border transition-all shadow-sm',
                           isFavorite
                             ? 'border-red-200 bg-red-50 text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400'
-                            : 'border-ink-200 text-ink-600 hover:border-ink-300 hover:text-ink-900 dark:border-ink-700 dark:text-ink-300 dark:hover:border-ink-600 dark:hover:text-white'
+                            : 'border-ink-200 text-ink-600 hover:border-ink-300 hover:text-ink-900 bg-white dark:bg-white/5 dark:border-white/10 dark:text-ink-300 dark:hover:border-white/20 dark:hover:text-white'
                         )}
                         aria-label={isFavorite ? 'Remove from favorites' : 'Save to favorites'}
                       >
                         <HeartIcon filled={isFavorite} className="h-4 w-4" />
-                      </button>
+                      </motion.button>
                     )}
                     {expert.linkedinUrl && (
-                      <a href={expert.linkedinUrl} target="_blank" rel="noopener noreferrer"
-                        className="grid h-9 w-9 place-items-center rounded-md border border-ink-200 text-ink-600 transition-colors hover:border-ink-300 hover:text-ink-900 dark:border-ink-700 dark:text-ink-300 dark:hover:border-ink-600 dark:hover:text-white"
+                      <motion.a 
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        href={expert.linkedinUrl} target="_blank" rel="noopener noreferrer"
+                        className="grid h-10 w-10 place-items-center rounded-xl border border-ink-200 bg-white text-ink-600 transition-all shadow-sm hover:border-ink-300 hover:text-ink-900 dark:bg-white/5 dark:border-white/10 dark:text-ink-300 dark:hover:border-white/20 dark:hover:text-white"
                         aria-label="LinkedIn profile">
                         <LinkedInIcon className="h-4 w-4" />
-                      </a>
+                      </motion.a>
                     )}
                   </div>
                 </div>
@@ -336,34 +375,44 @@ const ExpertDetailPage = () => {
                 </div>
               </div>
             )}
-          </div>
+          </motion.div>
 
           {/* Offers */}
-          {activeServices.length > 0 && (
+          {activeServices.length > 0 && !programToSchedule && (
             <div className="card p-6">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="font-display text-lg font-semibold text-ink-900 dark:text-white">Ways to work together</h2>
                   <p className="mt-0.5 text-sm text-ink-500 dark:text-ink-400">Pick a one-off session, a package, or a recurring plan.</p>
                 </div>
-                <div className="inline-flex rounded-lg border border-ink-200 bg-ink-50 p-1 dark:border-ink-800 dark:bg-ink-950">
+                <div className="inline-flex relative rounded-xl bg-ink-100 p-1 dark:bg-white/5">
                   {[
-                    { id: 'services', label: 'Services' },
-                    { id: 'packages', label: 'Packages' },
-                    { id: 'subscriptions', label: 'Subscriptions' },
+                    { id: 'services', label: 'Single Session' },
+                    { id: 'packages', label: 'Package' },
+                    { id: 'subscriptions', label: 'Subscription' },
                   ].map((item) => (
                     <button
                       key={item.id}
                       type="button"
-                      onClick={() => setActiveOfferTab(item.id)}
+                      onClick={() => {
+                        setActiveOfferTab(item.id);
+                        setPendingPackage(null);
+                      }}
                       className={clsx(
-                        'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                        'relative rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
                         activeOfferTab === item.id
-                          ? 'bg-white text-ink-900 shadow-sm dark:bg-ink-800 dark:text-white'
+                          ? 'text-ink-900 dark:text-white'
                           : 'text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white'
                       )}
                     >
-                      {item.label}
+                      {activeOfferTab === item.id && (
+                        <motion.div
+                          layoutId="offerTab"
+                          className="absolute inset-0 bg-white rounded-lg shadow-sm dark:bg-white/10"
+                          transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                        />
+                      )}
+                      <span className="relative z-10">{item.label}</span>
                     </button>
                   ))}
                 </div>
@@ -407,15 +456,16 @@ const ExpertDetailPage = () => {
                 </div>
               )}
 
-              {activeOfferTab === 'packages' && (
-                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              {activeOfferTab === 'packages' && !pendingPackage && (
+                <div className="mt-6 grid gap-4 sm:grid-cols-2">
                   {programPackages.map((pkg) => (
-                    <PackageCard
-                      key={pkg.id}
-                      pkg={pkg}
-                      disabled={isOwnProfile || programMutation.isPending}
-                      onStart={() => handleStartProgram(pkg)}
-                    />
+                    <motion.div key={pkg.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                      <PackageCard
+                        pkg={pkg}
+                        disabled={isOwnProfile || programMutation.isPending}
+                        onStart={() => handleStartProgram(pkg)}
+                      />
+                    </motion.div>
                   ))}
                 </div>
               )}
@@ -453,7 +503,18 @@ const ExpertDetailPage = () => {
           )}
 
           {/* Availability */}
+          {(activeOfferTab === 'services' || pendingPackage || programToSchedule) && (
           <div className="card p-6">
+            {programToSchedule && (
+              <div className="mb-6 rounded-lg border border-brand-200 bg-brand-50 p-4 dark:border-brand-500/30 dark:bg-brand-500/10">
+                <h2 className="text-sm font-semibold text-brand-900 dark:text-brand-300">
+                  Scheduling Session {nextSessionIndex} of {programToSchedule.totalSessions}
+                </h2>
+                <p className="mt-1 text-xs text-brand-700 dark:text-brand-400">
+                  Select a time slot for your next session in <strong>{programToSchedule.title}</strong>.
+                </p>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="font-display text-lg font-semibold text-ink-900 dark:text-white">Pick a time</h2>
@@ -468,27 +529,27 @@ const ExpertDetailPage = () => {
               </span>
             </div>
 
-            {sortedSlots.length === 0 ? (
+            {visibleSlots.length === 0 ? (
               <div className="mt-6"><EmptyState title="No availability" description="This expert has no slots open at the moment." /></div>
             ) : (
               <>
-                <div className="mt-5 -mx-1 flex flex-nowrap gap-2 overflow-x-auto pb-1">
-                  {sortedSlots.map((g) => {
+                <div className="mt-6 -mx-1 flex flex-nowrap gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                  {visibleSlots.map((g) => {
                     const allBooked = g.slots.every((s) => s.booked);
                     const isActive = g.date === activeDate;
                     return (
                       <button key={g.date} type="button" onClick={() => setActiveDate(g.date)}
                         className={clsx(
-                          'shrink-0 rounded-lg border px-3.5 py-2 text-left text-sm transition-colors',
+                          'shrink-0 rounded-xl border px-4 py-3 text-left transition-all',
                           isActive
-                            ? 'border-ink-900 bg-ink-900 text-white dark:border-white dark:bg-white dark:text-ink-900'
-                            : 'border-ink-200 bg-white text-ink-700 hover:border-ink-300 dark:border-ink-800 dark:bg-ink-900 dark:text-ink-200 dark:hover:border-ink-700',
-                          allBooked && 'opacity-60'
+                            ? 'border-brand-500 bg-brand-50 shadow-[0_0_0_2px_rgba(99,102,241,0.2)] dark:bg-brand-500/10 dark:border-brand-500/50 dark:shadow-glow'
+                            : 'border-ink-200 bg-white hover:border-ink-300 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20',
+                          allBooked && 'opacity-50 grayscale'
                         )}>
-                        <div className="font-medium">{formatDate(g.date)}</div>
+                        <div className={clsx("font-semibold text-base", isActive ? "text-brand-900 dark:text-brand-100" : "text-ink-900 dark:text-white")}>{formatDate(g.date)}</div>
                         <div className={clsx(
-                          'mt-0.5 text-xs',
-                          isActive ? 'text-white/80 dark:text-ink-700' : 'text-ink-500 dark:text-ink-400'
+                          'mt-1 text-xs font-medium',
+                          isActive ? 'text-brand-600 dark:text-brand-400' : 'text-ink-500 dark:text-ink-400'
                         )}>
                           {allBooked ? 'Fully booked' : `${g.slots.filter((s) => !s.booked).length} open`}
                         </div>
@@ -502,42 +563,48 @@ const ExpertDetailPage = () => {
                     <CalendarIcon className="h-4 w-4 text-ink-500 dark:text-ink-400" />
                     {formatDate(activeDay?.date, { weekday: 'long', month: 'long', year: 'numeric' })}
                   </div>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-                    {activeDay?.slots.map((s) => {
-                      const slotDateTime = new Date(`${activeDay.date} ${s.time}`);
-                      const now = new Date();
-                        const isPast =activeDay.date === now.toISOString().split('T')[0] &&slotDateTime.getTime() < now.getTime();
-                        const isWithinBuffer =activeDay.date === now.toISOString().split('T')[0] && slotDateTime.getTime() - now.getTime() <((expert.bookingBufferHours || 0) * 3600 * 1000);
-                      const isSelected = selectedSlot && selectedSlot.date === activeDay.date && selectedSlot.time === s.time;
-                      return (
-                        <button key={s.time} type="button" disabled={s.booked || isOwnProfile || isPast || isWithinBuffer}
-                          onClick={() => setSelectedSlot({ date: activeDay.date, time: s.time })}
-                          className={clsx(
-                            'group relative inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2.5 text-sm font-medium transition-all',
-                            (s.booked || isPast || isWithinBuffer)
-                              ? 'cursor-not-allowed border-ink-200 bg-ink-50 text-ink-400 line-through dark:border-ink-800 dark:bg-ink-900/50 dark:text-ink-600'
-                              : isOwnProfile
-                              ? 'cursor-not-allowed border-ink-200 bg-ink-50 text-ink-400 dark:border-ink-800 dark:bg-ink-900/50 dark:text-ink-600'
-                              : isSelected
-                              ? 'border-brand-500 bg-brand-500 text-white shadow-focus'
-                              : 'border-ink-200 bg-white text-ink-700 hover:border-ink-900 hover:text-ink-900 dark:border-ink-800 dark:bg-ink-900 dark:text-ink-200 dark:hover:border-white dark:hover:text-white'
-                          )}
-                          aria-pressed={isSelected}>
-                          <ClockIcon className={clsx('h-3.5 w-3.5',
-                            s.booked ? 'text-ink-400 dark:text-ink-600' :
-                            isSelected ? 'text-white' :
-                            'text-ink-400 group-hover:text-ink-700 dark:group-hover:text-ink-200'
-                          )} />
-                          {s.time}
-                          {isSelected && <CheckIcon className="h-3.5 w-3.5" />}
-                        </button>
-                      );
-                    })}
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                    <AnimatePresence mode="popLayout">
+                      {activeDay?.slots.map((s) => {
+                        const isPast = isSlotPast(activeDay.date, s.time);
+                        const isSelected = selectedSlot && selectedSlot.date === activeDay.date && selectedSlot.time === s.time;
+                        return (
+                          <motion.button 
+                            layout
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            whileHover={{ y: (s.booked || isPast || isOwnProfile) ? 0 : -2 }}
+                            whileTap={{ scale: (s.booked || isPast || isOwnProfile) ? 1 : 0.95 }}
+                            key={s.time} type="button" disabled={s.booked || isOwnProfile || isPast}
+                            onClick={() => setSelectedSlot({ date: activeDay.date, time: s.time })}
+                            className={clsx(
+                              'group relative inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition-all',
+                              (s.booked || isPast)
+                                ? 'cursor-not-allowed border-ink-200/50 bg-ink-50/50 text-ink-400 line-through dark:border-white/5 dark:bg-white/[0.02] dark:text-ink-600'
+                                : isOwnProfile
+                                ? 'cursor-not-allowed border-ink-200 bg-ink-50 text-ink-400 dark:border-white/10 dark:bg-white/5 dark:text-ink-500'
+                                : isSelected
+                                ? 'border-brand-500 bg-brand-500 text-white shadow-glow'
+                                : 'border-ink-200 bg-white text-ink-700 hover:border-brand-300 hover:text-brand-900 hover:shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-ink-200 dark:hover:border-brand-500/50 dark:hover:text-white dark:hover:bg-brand-500/10'
+                            )}
+                            aria-pressed={isSelected}>
+                            <ClockIcon className={clsx('h-4 w-4 transition-colors',
+                              s.booked ? 'text-ink-400 dark:text-ink-600' :
+                              isSelected ? 'text-white' :
+                              'text-ink-400 group-hover:text-brand-500 dark:text-ink-500 dark:group-hover:text-brand-400'
+                            )} />
+                            {s.time}
+                          </motion.button>
+                        );
+                      })}
+                    </AnimatePresence>
                   </div>
                 </div>
               </>
             )}
           </div>
+          )}
 
           {/* Reviews */}
           {expert.reviews?.length > 0 && (
@@ -617,13 +684,35 @@ const ExpertDetailPage = () => {
         {/* Sidebar */}
         <aside className="lg:sticky lg:top-24 lg:h-fit">
           <div className="card p-6">
-            {activeService ? (
+            {programToSchedule ? (
               <>
-                <div className="text-xs font-medium uppercase tracking-wide text-ink-500 dark:text-ink-400">Selected service</div>
-                <div className="mt-1.5 text-base font-semibold text-ink-900 dark:text-white">{activeService.name}</div>
+                <div className="text-xs font-medium uppercase tracking-wide text-ink-500 dark:text-ink-400">
+                  Scheduling Program
+                </div>
+                <div className="mt-1.5 text-base font-semibold text-ink-900 dark:text-white">
+                  {programToSchedule.title}
+                </div>
                 <div className="mt-3 flex items-baseline justify-between">
-                  <span className="font-display text-2xl font-bold text-ink-900 dark:text-white">{formatPrice(activeService.price)}</span>
-                  <span className="text-sm text-ink-500 dark:text-ink-400">{formatDuration(activeService.durationMinutes)}</span>
+                  <span className="font-display text-xl font-bold text-ink-900 dark:text-white">
+                    Session {nextSessionIndex} of {programToSchedule.totalSessions}
+                  </span>
+                </div>
+              </>
+            ) : activeService || pendingPackage ? (
+              <>
+                <div className="text-xs font-medium uppercase tracking-wide text-ink-500 dark:text-ink-400">
+                  {pendingPackage ? 'Selected package' : 'Selected service'}
+                </div>
+                <div className="mt-1.5 text-base font-semibold text-ink-900 dark:text-white">
+                  {pendingPackage ? pendingPackage.title : activeService.name}
+                </div>
+                <div className="mt-3 flex items-baseline justify-between">
+                  <span className="font-display text-2xl font-bold text-ink-900 dark:text-white">
+                    {formatPrice(pendingPackage ? pendingPackage.price : activeService.price)}
+                  </span>
+                  <span className="text-sm text-ink-500 dark:text-ink-400">
+                    {pendingPackage ? `${pendingPackage.totalSessions} sessions` : formatDuration(activeService.durationMinutes)}
+                  </span>
                 </div>
               </>
             ) : (
@@ -667,6 +756,8 @@ const ExpertDetailPage = () => {
       <BookingModal
         open={bookingOpen} onClose={() => setBookingOpen(false)}
         expert={expert} slot={selectedSlot} service={activeService}
+        pkg={pendingPackage}
+        existingProgram={programToSchedule ? { id: programToSchedule._id, index: nextSessionIndex, title: programToSchedule.title } : null}
       />
       <MessageExpertModal open={messageOpen} onClose={() => setMessageOpen(false)} expert={expert} />
     </div>
@@ -689,16 +780,21 @@ const PackageCard = ({ pkg, disabled, onStart }) => (
         <div className="text-xs text-ink-500 dark:text-ink-400">{pkg.totalSessions} sessions</div>
       </div>
     </div>
-    <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-ink-500 dark:text-ink-400">
-      <span className="inline-flex items-center gap-1.5 rounded-md bg-ink-50 px-2 py-1 dark:bg-ink-800">
-        <ClockIcon className="h-3.5 w-3.5" /> {formatDuration(pkg.service.durationMinutes)}
-      </span>
-      <span className="inline-flex items-center gap-1.5 rounded-md bg-ink-50 px-2 py-1 dark:bg-ink-800">
-        <CheckCircleIcon className="h-3.5 w-3.5" /> Progress tracked
-      </span>
+    <div className="mt-4 space-y-2 rounded-lg bg-ink-50/50 p-3 text-xs dark:bg-ink-800/30">
+      <div className="flex items-center justify-between">
+        <span className="text-ink-500 dark:text-ink-400">Duration</span>
+        <span className="font-medium text-ink-900 dark:text-white">{formatDuration(pkg.service.durationMinutes)} per session</span>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-ink-500 dark:text-ink-400">Timeline</span>
+        <span className="font-medium text-ink-900 dark:text-white">~{pkg.totalSessions} weeks</span>
+      </div>
     </div>
-    <button type="button" disabled={disabled} onClick={onStart} className="btn-secondary mt-4 w-full">
-      Start package
+    <p className="mt-4 text-center text-xs text-ink-500 dark:text-ink-400">
+      Session 1 of {pkg.totalSessions} starts after payment
+    </p>
+    <button type="button" disabled={disabled} onClick={onStart} className="btn-secondary mt-3 w-full">
+      Continue with Package
     </button>
   </div>
 );
@@ -732,12 +828,14 @@ const SubscriptionCard = ({ plan, cadence, disabled, onStart }) => (
 );
 
 const StatBlock = ({ icon: Icon, value, label }) => (
-  <div className="rounded-lg border border-ink-100 p-3 dark:border-ink-800">
-    <div className="flex items-center gap-1.5 text-ink-500 dark:text-ink-400">
-      <Icon className="h-3.5 w-3.5" />
-      <span className="text-[11px] font-medium uppercase tracking-wide">{label}</span>
+  <div className="rounded-xl border border-ink-100 bg-ink-50/50 p-4 dark:border-white/5 dark:bg-white/[0.02]">
+    <div className="flex items-center gap-2 text-ink-500 dark:text-ink-400">
+      <div className="p-1 rounded-md bg-white dark:bg-white/10 shadow-sm">
+        <Icon className="h-3.5 w-3.5" />
+      </div>
+      <span className="text-[11px] font-semibold uppercase tracking-widest">{label}</span>
     </div>
-    <div className="mt-1.5 font-display text-base font-bold text-ink-900 dark:text-white">{value}</div>
+    <div className="mt-2 font-display text-lg font-bold text-ink-900 dark:text-white">{value}</div>
   </div>
 );
 
@@ -754,6 +852,16 @@ const BackLink = () => (
     Back to experts
   </Link>
 );
+
+const SLOT_PAST_BUFFER_MS = 5 * 60 * 1000;
+
+const isSlotPast = (date, time, now = new Date()) => {
+  const slotDateTime = new Date(`${date} ${time}`);
+  return slotDateTime.getTime() + SLOT_PAST_BUFFER_MS < now.getTime();
+};
+
+const dayHasFutureSlot = (group) =>
+  group.slots?.some((s) => !isSlotPast(group.date, s.time));
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 

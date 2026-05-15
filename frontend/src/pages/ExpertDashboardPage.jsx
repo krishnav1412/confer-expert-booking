@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 
@@ -28,6 +29,8 @@ import {
   UsersIcon,
 } from '../components/Icons';
 import { formatDate, formatPrice, formatDuration, formatRelativeTime } from '../utils/format';
+import { SpatialCard, GlowOrb } from '../components/design-system';
+import { Reveal } from '../components/design-system/Motion';
 
 const PROMOTION_PLANS = [
   { id: 'weekly', label: '7 days', amount: 2499, blurb: 'Get featured for one week' },
@@ -153,9 +156,9 @@ const ExpertDashboardPage = () => {
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Link to={`/experts/${expert._id}`} className="btn-secondary text-sm">View public profile</Link>
-          <Link to="/expert-settings" className="btn-secondary text-sm">Manage profile</Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link to={`/experts/${expert._id}`} className="btn-secondary text-sm bg-white/50 dark:bg-white/5">View public profile</Link>
+          <Link to="/expert-settings" className="btn-secondary text-sm bg-white/50 dark:bg-white/5">Manage profile</Link>
         </div>
       </div>
 
@@ -178,7 +181,7 @@ const ExpertDashboardPage = () => {
         {/* Bookings */}
         <div className="lg:col-span-2">
           <div className="border-b border-ink-200 dark:border-ink-800">
-            <div className="-mb-px flex flex-wrap gap-1">
+            <div className="-mb-[2px] flex flex-wrap gap-2 sm:gap-6">
               {[
                 { id: 'upcoming', label: 'Upcoming', count: stats.upcoming.length },
                 { id: 'pending', label: 'Pending', count: stats.pending.length },
@@ -190,14 +193,24 @@ const ExpertDashboardPage = () => {
                   type="button"
                   onClick={() => setTab(t.id)}
                   className={clsx(
-                    'border-b-2 px-3 py-2.5 text-sm font-medium transition-colors',
+                    'relative border-b-2 px-1 py-3 text-sm font-medium transition-colors',
                     tab === t.id
-                      ? 'border-ink-900 text-ink-900 dark:border-white dark:text-white'
+                      ? 'border-transparent text-ink-900 dark:text-white'
                       : 'border-transparent text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white'
                   )}
                 >
+                  {tab === t.id && (
+                    <motion.div
+                      layoutId="expertTabIndicator"
+                      className="absolute -bottom-[2px] left-0 right-0 h-[2px] bg-brand-500 shadow-[0_-2px_10px_rgba(99,102,241,0.5)]"
+                      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                    />
+                  )}
                   {t.label}
-                  <span className="ml-1.5 inline-flex items-center rounded-full bg-ink-100 px-1.5 py-0.5 text-[11px] font-medium text-ink-600 dark:bg-ink-800 dark:text-ink-300">
+                  <span className={clsx(
+                    'ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors',
+                    tab === t.id ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300' : 'bg-ink-100 text-ink-600 dark:bg-white/5 dark:text-ink-400'
+                  )}>
                     {t.count}
                   </span>
                 </button>
@@ -205,22 +218,32 @@ const ExpertDashboardPage = () => {
             </div>
           </div>
 
-          <div className="mt-5">
-            {bookingsLoading ? <RowSkeleton rows={3} />
-              : visibleBookings.length === 0 ? (
-                <EmptyState title="Nothing here yet"
-                  description="When clients book or message you, sessions will appear here." />
-              ) : (
-                <div className="space-y-3">
-                  {visibleBookings.map((b) => (
-                    <BookingRow
-                      key={b._id}
-                      booking={b}
-                      onStatusChange={(status) => statusMutation.mutate({ id: b._id, status })}
-                    />
-                  ))}
-                </div>
-              )}
+          <div className="mt-6">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={tab}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                {bookingsLoading ? <RowSkeleton rows={3} />
+                  : visibleBookings.length === 0 ? (
+                    <EmptyState title="Nothing here yet"
+                      description="When clients book or message you, sessions will appear here." />
+                  ) : (
+                    <div className="space-y-4">
+                      {visibleBookings.map((b) => (
+                        <BookingRow
+                          key={b._id}
+                          booking={b}
+                          onStatusChange={(status) => statusMutation.mutate({ id: b._id, status })}
+                        />
+                      ))}
+                    </div>
+                  )}
+              </motion.div>
+            </AnimatePresence>
           </div>
         </div>
 
@@ -359,14 +382,19 @@ const ExpertDashboardPage = () => {
 };
 
 const KpiCard = ({ icon: Icon, label, value, hint }) => (
-  <div className="card p-5">
-    <div className="flex items-center gap-2 text-ink-500 dark:text-ink-400">
-      <Icon className="h-4 w-4" />
-      <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
+  <SpatialCard glow className="relative overflow-hidden p-6 group" padding={false}>
+    <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+      <Icon className="h-20 w-20 text-brand-500" />
     </div>
-    <div className="mt-3 font-display text-2xl font-bold text-ink-900 dark:text-white">{value}</div>
-    {hint && <div className="mt-1 text-xs text-ink-500 dark:text-ink-400">{hint}</div>}
-  </div>
+    <div className="flex items-center gap-3 text-ink-500 dark:text-ink-400">
+      <div className="h-8 w-8 rounded-lg bg-ink-100 dark:bg-white/5 flex items-center justify-center">
+        <Icon className="h-4 w-4 text-brand-600 dark:text-brand-400" />
+      </div>
+      <span className="text-xs font-semibold uppercase tracking-widest">{label}</span>
+    </div>
+    <div className="mt-4 font-display text-3xl font-bold text-ink-900 dark:text-white">{value}</div>
+    {hint && <div className="mt-2 text-xs text-ink-500 dark:text-ink-400 font-medium">{hint}</div>}
+  </SpatialCard>
 );
 
 const Stat = ({ label, value }) => (

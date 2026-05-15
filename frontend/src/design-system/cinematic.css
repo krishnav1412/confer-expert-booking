@@ -1,0 +1,76 @@
+/**
+ * Cinematic atmosphere — grain, vignette, ambient particles
+ */
+
+@layer utilities {
+  .ds-film-grain {
+    position: relative;
+  }
+
+  .ds-film-grain::after {
+    content: '';
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+    mix-blend-mode: overlay;
+  }
+
+  .dark .ds-film-grain::after {
+    opacity: 0.05;
+  }
+
+  .ds-vignette {
+    box-shadow: inset 0 0 120px rgb(0 0 0 / 0.45);
+  }
+
+  .ds-cinematic-section {
+    @apply relative overflow-hidden;
+  }
+
+  .ds-cinematic-section::before {
+    content: '';
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 70% 50% at 50% -20%, rgb(var(--ds-neon-indigo) / 0.04), transparent 55%);
+  }
+}
+
+@keyframes ds-particle-float {
+  0%,
+  100% {
+    transform: translate(0, 0);
+    opacity: 0.2;
+  }
+  50% {
+    transform: translate(6px, -12px);
+    opacity: 0.55;
+  }
+}
+
+@keyframes ds-shimmer-sweep {
+  0% {
+    transform: translateX(-120%) skewX(-12deg);
+  }
+  100% {
+    transform: translateX(220%) skewX(-12deg);
+  }
+}
+
+.animate-ds-particle {
+  animation: ds-particle-float 8s ease-in-out infinite;
+}
+
+.animate-ds-shimmer-sweep {
+  animation: ds-shimmer-sweep 6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ds-particle,
+  .animate-ds-shimmer-sweep {
+    animation: none;
+  }
+}

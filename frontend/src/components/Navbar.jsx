@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import clsx from 'clsx';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -8,12 +9,13 @@ import NotificationBell from './NotificationBell';
 import { SunIcon, MoonIcon, MenuIcon, XIcon } from './Icons';
 
 const publicNav = [
-  { to: '/', label: 'Browse', end: true },
+  { to: '/', label: 'Home', end: true },
+  { to: '/#how-it-works', label: 'How it works', end: false },
   { to: '/contact', label: 'Contact' },
 ];
 
 const authedNav = [
-  { to: '/', label: 'Browse', end: true },
+  { to: '/discover', label: 'Discover', end: true },
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/messages', label: 'Messages' },
   { to: '/contact', label: 'Contact' },
@@ -27,12 +29,16 @@ const Navbar = () => {
   const items = isAuthenticated ? authedNav : publicNav;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-ink-200/70 bg-white/80 backdrop-blur-md dark:border-ink-800/70 dark:bg-ink-950/75">
+    <motion.header 
+      initial={{ y: -20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+      className="sticky top-0 z-50 border-b border-white/5 bg-[rgb(var(--ds-glass-bg))]/60 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:bg-[rgb(var(--ds-bg-base))]/40"
+    >
       <div className="container-app flex h-16 items-center justify-between">
         <Link to="/" className="flex items-center gap-2.5" aria-label="Confer home">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-ink-900 dark:bg-white">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-              stroke={theme === 'dark' ? '#13161c' : '#ffffff'} strokeWidth="2.4" strokeLinecap="round">
+          <span className="grid h-8 w-8 place-items-center rounded-[10px] bg-gradient-to-br from-brand-500 to-accent-500 shadow-glow text-white">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
               <path d="M5 7h14M5 12h14M5 17h9" />
             </svg>
           </span>
@@ -164,7 +170,7 @@ const Navbar = () => {
           </nav>
         </div>
       )}
-    </header>
+    </motion.header>
   );
 };
 

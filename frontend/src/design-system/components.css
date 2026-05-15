@@ -1,0 +1,147 @@
+/**
+ * Confer design system — glass, glow, premium buttons
+ * Use ds-* classes for new UI; legacy .btn / .card remain supported.
+ */
+
+@layer components {
+  /* ── Glow utilities ── */
+  .ds-glow-sm {
+    box-shadow:
+      0 0 12px rgb(var(--ds-glow-brand)),
+      0 0 24px rgb(var(--ds-glow-brand) / 0.15);
+  }
+
+  .ds-glow-md {
+    box-shadow:
+      0 0 16px rgb(var(--ds-glow-brand) / 0.5),
+      0 0 32px rgb(var(--ds-glow-cyan) / 0.08);
+  }
+
+  .ds-glow-ring {
+    box-shadow:
+      0 0 0 1px rgb(var(--ds-glass-border)),
+      0 0 12px rgb(var(--ds-glow-brand) / 0.12),
+      inset 0 1px 0 rgb(var(--ds-glass-highlight));
+  }
+
+  .ds-glow-text {
+    text-shadow: 0 0 16px rgb(var(--ds-glow-cyan) / 0.2);
+  }
+
+  /* ── Glass surfaces ── */
+  .ds-glass {
+    @apply rounded-2xl backdrop-blur-xl;
+    background: rgb(var(--ds-glass-bg));
+    border: 1px solid rgb(var(--ds-glass-border));
+    box-shadow:
+      0 8px 32px rgb(var(--ds-glass-shadow)),
+      inset 0 1px 0 rgb(var(--ds-glass-highlight));
+  }
+
+  .ds-glass-card {
+    @apply rounded-2xl backdrop-blur-2xl transition-all duration-500;
+    background: linear-gradient(
+      165deg,
+      rgb(var(--ds-glass-bg)) 0%,
+      rgb(var(--ds-glass-bg) / 0.6) 100%
+    );
+    border: 1px solid rgb(var(--ds-glass-border));
+    box-shadow:
+      0 1px 0 rgb(var(--ds-glass-highlight) / 0.5) inset,
+      0 8px 40px rgb(var(--ds-glass-shadow)),
+      0 0 0 1px rgb(0 0 0 / 0.2);
+  }
+
+  .ds-glass-card:hover {
+    border-color: rgb(var(--ds-glass-highlight) / 0.5);
+    box-shadow:
+      0 12px 40px rgb(var(--ds-glass-shadow)),
+      0 0 16px rgb(var(--ds-glow-brand) / 0.06),
+      inset 0 1px 0 rgb(var(--ds-glass-highlight));
+  }
+
+  .ds-glass-panel {
+    @apply rounded-2xl backdrop-blur-2xl;
+    background: rgb(var(--ds-bg-overlay));
+    border: 1px solid rgb(var(--ds-glass-border));
+    box-shadow:
+      0 16px 48px rgb(0 0 0 / 0.4),
+      inset 0 1px 0 rgb(var(--ds-glass-highlight));
+  }
+
+  .ds-glass-subtle {
+    @apply rounded-xl backdrop-blur-md;
+    background: rgb(var(--ds-glass-bg));
+    border: 1px solid rgb(var(--ds-glass-border) / 0.6);
+  }
+
+  /* ── Premium buttons (opt-in) ── */
+  .ds-btn {
+    @apply relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-xl px-4 py-2.5 text-sm font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50;
+    transition-timing-function: var(--ds-ease-out-expo);
+    transition-duration: var(--ds-duration-base);
+  }
+
+  .ds-btn-primary {
+    @apply ds-btn text-white;
+    background: linear-gradient(
+      135deg,
+      rgb(79 70 229) 0%,
+      rgb(var(--ds-neon-indigo)) 40%,
+      rgb(109 40 217) 100%
+    );
+    border: 1px solid rgb(255 255 255 / 0.1);
+    box-shadow:
+      0 2px 12px rgb(var(--ds-glow-brand)),
+      inset 0 1px 0 rgb(255 255 255 / 0.12);
+  }
+
+  .ds-btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow:
+      0 6px 20px rgb(var(--ds-glow-brand)),
+      0 0 20px rgb(var(--ds-glow-cyan) / 0.1),
+      inset 0 1px 0 rgb(255 255 255 / 0.15);
+  }
+
+  .ds-btn-primary:active:not(:disabled) {
+    transform: translateY(0) scale(0.98);
+    transition-duration: var(--ds-duration-fast);
+  }
+
+  .ds-btn-secondary {
+    @apply ds-btn;
+    color: rgb(var(--ds-text-primary));
+    background: rgb(var(--ds-glass-bg));
+    border: 1px solid rgb(var(--ds-glass-border));
+    backdrop-filter: blur(12px);
+    box-shadow: inset 0 1px 0 rgb(var(--ds-glass-highlight));
+  }
+
+  .ds-btn-secondary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    border-color: rgb(var(--ds-glass-highlight));
+    box-shadow:
+      0 4px 20px rgb(var(--ds-glass-shadow)),
+      inset 0 1px 0 rgb(var(--ds-glass-highlight));
+  }
+
+  .ds-btn-ghost {
+    @apply ds-btn;
+    color: rgb(var(--ds-text-secondary));
+    background: transparent;
+  }
+
+  .ds-btn-ghost:hover:not(:disabled) {
+    color: rgb(var(--ds-text-primary));
+    background: rgb(var(--ds-glass-bg));
+  }
+
+  .ds-btn-glow {
+    @apply ds-btn-primary;
+    box-shadow:
+      0 2px 12px rgb(var(--ds-glow-brand)),
+      0 0 16px rgb(var(--ds-glow-brand) / 0.2),
+      inset 0 1px 0 rgb(255 255 255 / 0.12);
+  }
+}

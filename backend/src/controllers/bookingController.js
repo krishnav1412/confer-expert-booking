@@ -83,11 +83,10 @@ export const createBookingForUser = async ({
     throw new ApiError(400, 'This date is blocked by the expert');
   }
 
-  // Buffer check
+  // Past check with 5-min grace window
   const slotStart = parseSlotToDate(date, timeSlot, expert.timezone || 'Asia/Kolkata');
-  const bufferMs = (expert.bookingBufferHours || 0) * 3600 * 1000;
-  if (slotStart && slotStart.getTime() - Date.now() < bufferMs) {
-    throw new ApiError(400, 'This slot is within the expert\'s booking buffer window');
+  if (slotStart && slotStart.getTime() + (5 * 60 * 1000) < Date.now()) {
+    throw new ApiError(400, 'Cannot book slots in the past');
   }
 
   const serviceSnapshot = serviceSnapshotOverride || resolveServiceSnapshot(expert, serviceId);
