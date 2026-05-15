@@ -19,7 +19,7 @@ const PremiumButton = forwardRef(
       variant = 'primary',
       href,
       to,
-      rounded = 'xl',
+      rounded = 'full',
       magnetic = false,
       ...props
     },
@@ -32,9 +32,16 @@ const PremiumButton = forwardRef(
     const sy = useSpring(my, { stiffness: 280, damping: 22 });
     const spotlight = useMotionTemplate`radial-gradient(120px circle at ${sx}px ${sy}px, rgba(255,255,255,0.14), transparent 70%)`;
 
+    const pillRadius =
+      rounded === 'full'
+        ? 'rounded-[var(--ds-btn-radius)]'
+        : rounded === 'lg'
+          ? 'rounded-2xl'
+          : 'rounded-xl';
+
     const classes = clsx(
       variantClass[variant] || variantClass.primary,
-      rounded === 'full' && '!rounded-full',
+      pillRadius,
       'ds-light-sweep relative',
       magnetic && 'overflow-hidden',
       className
@@ -61,7 +68,7 @@ const PremiumButton = forwardRef(
     const wrap = (node) => (
       <motion.div
         ref={wrapRef}
-        className="relative inline-block"
+        className={clsx('relative inline-block', pillRadius)}
         onMouseMove={onMove}
         onMouseLeave={onLeave}
         {...motionProps}

@@ -95,7 +95,7 @@ const UserDashboardPage = () => {
         </div>
         <Link
           to="/discover"
-          className="ds-btn-secondary shrink-0 !rounded-full !px-6 !py-2.5 text-sm"
+          className="ds-btn-secondary shrink-0 !px-6 text-sm"
         >
           Discover mentors
         </Link>

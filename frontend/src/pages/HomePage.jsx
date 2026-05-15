@@ -301,7 +301,7 @@ const HomePage = () => {
             </p>
             <Link
               to="/become-expert"
-              className="btn-secondary mt-8 inline-flex !rounded-full !px-8 !py-3"
+              className="btn-secondary mt-8 inline-flex !px-8 !py-3.5"
             >
               Apply to mentor
             </Link>

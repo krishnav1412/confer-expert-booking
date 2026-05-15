@@ -43,6 +43,14 @@
     --ds-duration-base: 280ms;
     --ds-duration-slow: 520ms;
 
+    /* Button geometry — Raycast / Apple capsule */
+    --ds-btn-radius: 9999px;
+    --ds-btn-px: 1.375rem;
+    --ds-btn-py: 0.6875rem;
+    --ds-btn-px-lg: 1.75rem;
+    --ds-btn-py-lg: 0.8125rem;
+    --ds-btn-min-h: 2.625rem;
+
     /* Ambient mesh */
     --ds-mesh-1: 99 102 241 / 0.06;
     --ds-mesh-2: 168 85 247 / 0.04;

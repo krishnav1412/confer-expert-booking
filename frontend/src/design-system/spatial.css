@@ -101,6 +101,7 @@
   .ds-light-sweep {
     position: relative;
     overflow: hidden;
+    border-radius: inherit;
   }
 
   .ds-light-sweep::after {
@@ -110,15 +111,22 @@
     left: -50%;
     width: 40%;
     height: 200%;
+    border-radius: inherit;
     background: linear-gradient(
       90deg,
       transparent,
-      rgb(255 255 255 / 0.03),
+      rgb(255 255 255 / 0.05),
       transparent
     );
     transform: rotate(25deg);
     animation: ds-light-sweep 8s ease-in-out infinite;
     pointer-events: none;
+  }
+
+  .ds-btn.ds-light-sweep::after,
+  .ds-light-sweep.ds-btn-primary::after,
+  .ds-light-sweep.ds-btn-glow::after {
+    border-radius: var(--ds-btn-radius);
   }
 }
 
