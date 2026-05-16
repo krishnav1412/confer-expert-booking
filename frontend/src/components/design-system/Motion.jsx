@@ -42,7 +42,7 @@ export const Stagger = ({ children, className, ...props }) => (
 );
 
 export const StaggerItem = ({ children, className, ...props }) => (
-  <motion.div className={className} variants={staggerItem} {...props}>
+  <motion.div className={clsx('h-full', className)} variants={staggerItem} {...props}>
     {children}
   </motion.div>
 );

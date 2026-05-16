@@ -98,33 +98,32 @@
     @apply ds-btn text-white;
     background: linear-gradient(
       165deg,
-      rgb(88 80 236) 0%,
-      rgb(var(--ds-neon-indigo)) 42%,
-      rgb(124 58 237) 100%
+      rgb(38 38 42) 0%,
+      rgb(28 28 32) 42%,
+      rgb(22 22 26) 100%
     );
     background-size: 100% 100%;
-    border: 1px solid rgb(255 255 255 / 0.14);
+    border: 1px solid rgb(255 255 255 / 0.1);
     box-shadow:
-      0 1px 2px rgb(0 0 0 / 0.14),
-      0 4px 16px rgb(var(--ds-glow-brand)),
-      0 0 0 1px rgb(255 255 255 / 0.06) inset,
-      inset 0 1px 0 rgb(255 255 255 / 0.16);
+      0 1px 2px rgb(0 0 0 / 0.3),
+      0 4px 12px rgb(0 0 0 / 0.2),
+      inset 0 1px 0 rgb(255 255 255 / 0.08);
   }
 
   .ds-btn-primary:hover:not(:disabled) {
     transform: translateY(-1px);
-    filter: brightness(1.04);
+    filter: brightness(1.12);
+    border-color: rgb(255 255 255 / 0.16);
     box-shadow:
-      0 2px 4px rgb(0 0 0 / 0.12),
-      0 8px 28px rgb(var(--ds-glow-brand)),
-      0 0 36px rgb(var(--ds-glow-cyan) / 0.1),
-      0 0 0 1px rgb(255 255 255 / 0.1) inset,
-      inset 0 1px 0 rgb(255 255 255 / 0.2);
+      0 2px 4px rgb(0 0 0 / 0.2),
+      0 8px 24px rgb(0 0 0 / 0.25),
+      0 0 20px rgb(255 255 255 / 0.04),
+      inset 0 1px 0 rgb(255 255 255 / 0.12);
   }
 
   .ds-btn-primary:active:not(:disabled) {
     transform: translateY(0) scale(0.985);
-    filter: brightness(0.98);
+    filter: brightness(0.95);
     transition-duration: var(--ds-duration-fast);
   }
 
@@ -154,7 +153,7 @@
     );
     box-shadow:
       0 4px 20px rgb(var(--ds-glass-shadow)),
-      0 0 24px rgb(var(--ds-glow-brand) / 0.06),
+      0 0 16px rgb(255 255 255 / 0.03),
       inset 0 1px 0 rgb(var(--ds-glass-highlight));
   }
 
@@ -180,20 +179,22 @@
 
   .ds-btn-glow {
     @apply ds-btn-primary;
+    border-color: rgb(255 255 255 / 0.14);
     box-shadow:
-      0 1px 2px rgb(0 0 0 / 0.14),
-      0 4px 18px rgb(var(--ds-glow-brand)),
-      0 0 28px rgb(var(--ds-glow-brand) / 0.22),
-      0 0 48px rgb(var(--ds-glow-purple) / 0.08),
-      inset 0 1px 0 rgb(255 255 255 / 0.16);
+      0 1px 2px rgb(0 0 0 / 0.3),
+      0 4px 16px rgb(0 0 0 / 0.25),
+      0 0 20px rgb(255 255 255 / 0.06),
+      0 0 40px rgb(255 255 255 / 0.025),
+      inset 0 1px 0 rgb(255 255 255 / 0.1);
   }
 
   .ds-btn-glow:hover:not(:disabled) {
+    border-color: rgb(255 255 255 / 0.2);
     box-shadow:
-      0 2px 4px rgb(0 0 0 / 0.12),
-      0 8px 32px rgb(var(--ds-glow-brand)),
-      0 0 40px rgb(var(--ds-glow-brand) / 0.28),
-      0 0 56px rgb(var(--ds-glow-purple) / 0.12),
-      inset 0 1px 0 rgb(255 255 255 / 0.2);
+      0 2px 4px rgb(0 0 0 / 0.2),
+      0 8px 28px rgb(0 0 0 / 0.3),
+      0 0 28px rgb(255 255 255 / 0.08),
+      0 0 48px rgb(255 255 255 / 0.04),
+      inset 0 1px 0 rgb(255 255 255 / 0.14);
   }
 }

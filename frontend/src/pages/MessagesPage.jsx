@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
-import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 
@@ -20,12 +19,11 @@ import { MessageIcon, SendIcon, ArrowLeftIcon, InboxIcon } from '../components/I
 import { formatRelativeTime } from '../utils/format';
 import { GlowOrb } from '../components/design-system';
 import { Reveal } from '../components/design-system/Motion';
-import { fadeInUp } from '../design-system/motion/presets';
 
 const MessagesPage = () => {
   const { isExpert } = useAuth();
-  const [params, setParams] = useSearchParams();
-  const role = params.get('role') === 'expert' && isExpert ? 'expert' : 'user';
+  const [searchParams, setSearchParams] = useSearchParams();
+  const role = searchParams.get('role') === 'expert' && isExpert ? 'expert' : 'user';
   const [activeId, setActiveId] = useState(null);
 
   const { data: conversations = [], isLoading } = useQuery({
@@ -41,14 +39,15 @@ const MessagesPage = () => {
   }, [conversations, activeId]);
 
   const switchRole = (next) => {
-    if (next === 'expert') params.set('role', 'expert');
-    else params.delete('role');
-    setParams(params, { replace: true });
+    const nextParams = new URLSearchParams(searchParams);
+    if (next === 'expert') nextParams.set('role', 'expert');
+    else nextParams.delete('role');
+    setSearchParams(nextParams, { replace: true });
     setActiveId(null);
   };
 
   return (
-    <div className="relative min-h-[calc(100vh-4rem)] overflow-hidden">
+    <div className="relative min-h-[calc(100vh-4rem)]">
       <GlowOrb color="purple" size="xl" className="absolute -left-40 top-20 opacity-40" />
       <GlowOrb color="cyan" size="lg" className="absolute right-0 bottom-0 opacity-30" />
 
@@ -209,6 +208,7 @@ const MessagesPage = () => {
 
 const ConversationPanel = ({ conversationId, role, onBack }) => {
   const queryClient = useQueryClient();
+  const markedReadRef = useRef(null);
 
   const { data: convo, isLoading } = useQuery({
     queryKey: ['conversation', conversationId],
@@ -220,15 +220,35 @@ const ConversationPanel = ({ conversationId, role, onBack }) => {
   const markRead = useMutation({
     mutationFn: () => markConversationRead(conversationId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.setQueriesData({ queryKey: ['conversations'] }, (old) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((c) => {
+          if (c._id !== conversationId) return c;
+          return role === 'expert'
+            ? { ...c, unreadByExpert: 0 }
+            : { ...c, unreadByUser: 0 };
+        });
+      });
+      queryClient.setQueryData(['conversation', conversationId], (old) => {
+        if (!old) return old;
+        return role === 'expert'
+          ? { ...old, unreadByExpert: 0 }
+          : { ...old, unreadByUser: 0 };
+      });
     },
   });
 
   useEffect(() => {
-    if (convo) markRead.mutate();
+    if (!convo?._id || markedReadRef.current === conversationId) return;
+    const unread = role === 'expert' ? convo.unreadByExpert : convo.unreadByUser;
+    if (!unread) {
+      markedReadRef.current = conversationId;
+      return;
+    }
+    markedReadRef.current = conversationId;
+    markRead.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, convo?._id]);
+  }, [conversationId, convo?._id, role]);
 
   const replyMutation = useMutation({
     mutationFn: (text) => replyToConversation(conversationId, text),
@@ -283,15 +303,11 @@ const ConversationPanel = ({ conversationId, role, onBack }) => {
             <span className="font-medium text-ink-700 dark:text-ink-300">Subject:</span> {convo.subject}
           </div>
         )}
-        <AnimatePresence initial={false}>
-          {convo.messages.map((m) => {
+        {convo.messages.map((m) => {
             const fromMe = m.sender === role;
             return (
-              <motion.div
+              <div
                 key={m._id}
-                variants={fadeInUp}
-                initial="hidden"
-                animate="visible"
                 className={clsx('flex', fromMe ? 'justify-end' : 'justify-start')}
               >
                 <div
@@ -303,19 +319,18 @@ const ConversationPanel = ({ conversationId, role, onBack }) => {
                   )}
                 >
                   <p className="whitespace-pre-wrap">{m.text}</p>
-                  <motion.div
+                  <div
                     className={clsx(
                       'mt-1 text-[10px]',
                       fromMe ? 'text-white/60' : 'text-ink-400 dark:text-ink-500'
                     )}
                   >
                     {formatRelativeTime(m.createdAt)}
-                  </motion.div>
+                  </div>
                 </div>
-              </motion.div>
+              </div>
             );
           })}
-        </AnimatePresence>
       </div>
 
       <form

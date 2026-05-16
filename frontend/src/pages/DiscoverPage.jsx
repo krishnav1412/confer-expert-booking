@@ -45,7 +45,7 @@ const DiscoverPage = () => {
   const pagination = data?.pagination;
 
   return (
-    <div className="relative min-h-[calc(100vh-4rem)] overflow-hidden">
+    <div className="relative min-h-[calc(100vh-4rem)]">
       <GlowOrb color="brand" size="lg" className="absolute -right-24 top-0 opacity-15" />
 
       <div className="container-app relative z-10 py-12 md:py-16">

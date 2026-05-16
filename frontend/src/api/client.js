@@ -35,15 +35,16 @@ client.interceptors.response.use(
     const data = error.response?.data;
 
     if (status === 401) {
-      // Clear stale token; AuthProvider will pick this up on next render
       setStoredToken(null);
-      // Hard redirect only if we're not already on a public auth route
-      if (typeof window !== 'undefined') {
+      if (typeof window !== 'undefined' && !window.__confer401Fired) {
         const path = window.location.pathname;
         const onAuthPage = path === '/login' || path === '/signup';
         if (!onAuthPage) {
-          // Soft signal — emit event so AuthContext can react
+          window.__confer401Fired = true;
           window.dispatchEvent(new CustomEvent('confer:unauthorized'));
+          window.setTimeout(() => {
+            window.__confer401Fired = false;
+          }, 1000);
         }
       }
     }

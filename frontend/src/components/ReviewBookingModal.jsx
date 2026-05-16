@@ -37,7 +37,7 @@ const ReviewBookingModal = ({ open, onClose, booking }) => {
     mutationFn: (values) => submitReview({ bookingId: booking._id, ...values }),
     onSuccess: () => {
       setDone(true);
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['bookings', 'me'] });
       queryClient.invalidateQueries({ queryKey: ['expert', booking?.expertId?._id] });
       toast.success('Thank you for your review');
     },

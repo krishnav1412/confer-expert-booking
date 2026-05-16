@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 
 const Footer = () => {
   return (
-    <footer className="mt-24 border-t border-ink-200/50 bg-white dark:border-white/5 dark:bg-[#050505]">
+    <footer className="mt-24 border-t border-white/5 bg-[#050505]">
       <div className="container-app py-16">
         <div className="grid gap-12 md:grid-cols-4">
           <div className="md:col-span-2">
@@ -12,35 +12,35 @@ const Footer = () => {
                   <path d="M5 7h14M5 12h14M5 17h9" />
                 </svg>
               </span>
-              <span className="font-display text-lg font-bold tracking-tight text-ink-900 dark:text-white">Confer</span>
+              <span className="font-display text-lg font-bold tracking-tight text-white">Confer</span>
             </div>
-            <p className="mt-3 max-w-md text-sm text-ink-500 dark:text-ink-400">
+            <p className="mt-3 max-w-md text-sm text-ink-400">
               India's premium marketplace for booking real conversations with vetted mentors, designers, engineers, and founders.
             </p>
           </div>
 
           <div>
-            <h4 className="text-sm font-semibold text-ink-900 dark:text-white">Platform</h4>
+            <h4 className="text-sm font-semibold text-white">Platform</h4>
             <ul className="mt-3 space-y-2 text-sm">
-              <li><Link to="/" className="text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white">Browse experts</Link></li>
-              <li><Link to="/become-expert" className="text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white">Become an expert</Link></li>
-              <li><Link to="/dashboard" className="text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white">Your dashboard</Link></li>
-              <li><Link to="/messages" className="text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white">Messages</Link></li>
+              <li><Link to="/" className="text-ink-400 hover:text-white">Browse experts</Link></li>
+              <li><Link to="/become-expert" className="text-ink-400 hover:text-white">Become an expert</Link></li>
+              <li><Link to="/dashboard" className="text-ink-400 hover:text-white">Your dashboard</Link></li>
+              <li><Link to="/messages" className="text-ink-400 hover:text-white">Messages</Link></li>
             </ul>
           </div>
 
           <div>
-            <h4 className="text-sm font-semibold text-ink-900 dark:text-white">Company</h4>
+            <h4 className="text-sm font-semibold text-white">Company</h4>
             <ul className="mt-3 space-y-2 text-sm">
-              <li><Link to="/contact" className="text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white">Contact</Link></li>
-              <li><a href="#" className="text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white">About</a></li>
-              <li><a href="#" className="text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white">Privacy</a></li>
-              <li><a href="#" className="text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white">Terms</a></li>
+              <li><Link to="/contact" className="text-ink-400 hover:text-white">Contact</Link></li>
+              <li><a href="#" className="text-ink-400 hover:text-white">About</a></li>
+              <li><a href="#" className="text-ink-400 hover:text-white">Privacy</a></li>
+              <li><a href="#" className="text-ink-400 hover:text-white">Terms</a></li>
             </ul>
           </div>
         </div>
 
-        <div className="mt-16 border-t border-ink-200/50 pt-8 text-xs text-ink-400 dark:border-white/5">
+        <div className="mt-16 border-t border-white/5 pt-8 text-xs text-ink-400">
           © {new Date().getFullYear()} Confer. Crafted with velocity.
         </div>
       </div>

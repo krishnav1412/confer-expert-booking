@@ -34,9 +34,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
               toastOptions={{
                 className: '!rounded-lg !text-sm !shadow-card',
                 style: {
-                  background: 'rgb(var(--toast-bg) / 1)',
-                  color: 'rgb(var(--toast-fg) / 1)',
-                  border: '1px solid rgb(var(--toast-border) / 1)',
+                  background: '#0b0c0f',
+                  color: '#f5f5f5',
+                  border: '1px solid rgba(255,255,255,0.08)',
                 },
               }}
             />

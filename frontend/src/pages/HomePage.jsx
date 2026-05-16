@@ -111,14 +111,14 @@ const HomePage = () => {
           {HOW_STEPS.map((step, i) => (
             <StaggerItem key={step.title}>
               <SpatialCard
-                className={clsx('flex flex-col p-8', i % 2 === 1 && 'lg:translate-y-4')}
+                className="flex h-full flex-col p-8"
                 padding={false}
               >
                 <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03]">
                   <step.icon className="h-5 w-5 text-white/70" />
                 </div>
                 <h3 className="text-lg font-semibold text-white">{step.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-ink-400">{step.description}</p>
+                <p className="mt-2 flex-1 text-sm leading-relaxed text-ink-400">{step.description}</p>
               </SpatialCard>
             </StaggerItem>
           ))}

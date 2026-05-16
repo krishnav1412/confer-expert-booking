@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 
 import { fetchMyBookings } from '../api/bookings';
@@ -33,24 +32,30 @@ const UserDashboardPage = () => {
   const [tab, setTab] = useState('upcoming');
   const [reviewBooking, setReviewBooking] = useState(null);
 
+  const dashboardQueryOpts = { staleTime: 60_000, refetchOnMount: false };
+
   const { data: bookings = [], isLoading } = useQuery({
     queryKey: ['bookings', 'me'],
     queryFn: fetchMyBookings,
+    ...dashboardQueryOpts,
   });
 
   const { data: programs = [], isLoading: programsLoading } = useQuery({
     queryKey: ['programs', 'me'],
     queryFn: fetchMyPrograms,
+    ...dashboardQueryOpts,
   });
 
   const { data: subscriptions = [], isLoading: subscriptionsLoading } = useQuery({
     queryKey: ['subscriptions', 'me'],
     queryFn: fetchMySubscriptions,
+    ...dashboardQueryOpts,
   });
 
   const { data: favorites = [] } = useQuery({
     queryKey: ['favorites', 'me'],
     queryFn: listFavorites,
+    ...dashboardQueryOpts,
   });
 
   const today = new Date().toISOString().split('T')[0];
@@ -84,7 +89,7 @@ const UserDashboardPage = () => {
     all;
 
   return (
-    <motion.div className="relative">
+    <div className="relative">
       <GlowOrb color="purple" size="lg" className="absolute -right-20 top-0 opacity-15" />
       <div className="container-app relative z-10 py-12">
       <Reveal className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
@@ -129,13 +134,13 @@ const UserDashboardPage = () => {
                   : 'border-transparent text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white'
               )}
             >
-              {tab === t.id && (
-                <motion.div
-                  layoutId="activeTabIndicator"
-                  className="absolute -bottom-[2px] left-0 right-0 h-[2px] bg-brand-500 shadow-[0_-2px_10px_rgba(99,102,241,0.5)]"
-                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                />
-              )}
+              <span
+                aria-hidden
+                className={clsx(
+                  'absolute -bottom-[2px] left-0 right-0 h-[2px] bg-brand-500 shadow-[0_-2px_10px_rgba(99,102,241,0.5)] transition-opacity duration-200',
+                  tab === t.id ? 'opacity-100' : 'opacity-0'
+                )}
+              />
               {t.label}
               <span className={clsx(
                 'ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors',
@@ -149,14 +154,7 @@ const UserDashboardPage = () => {
       </div>
 
       <div className="mt-8">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={tab}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-          >
+        <div key={tab} className="ds-tab-panel">
             {tab === 'favorites' ? (
               favorites.length === 0 ? (
                 <EmptyState
@@ -234,8 +232,7 @@ const UserDashboardPage = () => {
                 {visibleList.map((b) => <BookingRow key={b._id} booking={b} onReview={() => setReviewBooking(b)} />)}
               </div>
             )}
-          </motion.div>
-        </AnimatePresence>
+        </div>
       </div>
 
       <ReviewBookingModal
@@ -244,7 +241,7 @@ const UserDashboardPage = () => {
         booking={reviewBooking}
       />
       </div>
-    </motion.div>
+    </div>
   );
 };
 

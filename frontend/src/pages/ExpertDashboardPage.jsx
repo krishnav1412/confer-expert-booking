@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 
@@ -112,7 +111,7 @@ const ExpertDashboardPage = () => {
   const statusMutation = useMutation({
     mutationFn: ({ id, status }) => updateBookingStatus(id, status),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['bookings', 'expert', 'me'] });
       queryClient.invalidateQueries({ queryKey: ['expert', 'me', 'analytics'] });
       toast.success('Status updated');
     },
@@ -199,13 +198,13 @@ const ExpertDashboardPage = () => {
                       : 'border-transparent text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-white'
                   )}
                 >
-                  {tab === t.id && (
-                    <motion.div
-                      layoutId="expertTabIndicator"
-                      className="absolute -bottom-[2px] left-0 right-0 h-[2px] bg-brand-500 shadow-[0_-2px_10px_rgba(99,102,241,0.5)]"
-                      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                    />
-                  )}
+                  <span
+                    aria-hidden
+                    className={clsx(
+                      'absolute -bottom-[2px] left-0 right-0 h-[2px] bg-brand-500 shadow-[0_-2px_10px_rgba(99,102,241,0.5)] transition-opacity duration-200',
+                      tab === t.id ? 'opacity-100' : 'opacity-0'
+                    )}
+                  />
                   {t.label}
                   <span className={clsx(
                     'ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors',
@@ -219,14 +218,7 @@ const ExpertDashboardPage = () => {
           </div>
 
           <div className="mt-6">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={tab}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-              >
+            <div key={tab} className="ds-tab-panel">
                 {bookingsLoading ? <RowSkeleton rows={3} />
                   : visibleBookings.length === 0 ? (
                     <EmptyState title="Nothing here yet"
@@ -242,8 +234,7 @@ const ExpertDashboardPage = () => {
                       ))}
                     </div>
                   )}
-              </motion.div>
-            </AnimatePresence>
+            </div>
           </div>
         </div>
 

@@ -6,14 +6,48 @@
  *   - 'smtp':                     SMTP via nodemailer (Resend/SendGrid SMTP/Mailgun/etc.)
  *   - 'noop':                     silently drops mail (use in CI/tests)
  *
- * Every call is fire-and-forget at the controller layer — never await in a
- * request handler. Errors are logged but do not surface to the user.
+ * Reliability improvements:
+ *   - Retry with exponential backoff (up to 3 attempts)
+ *   - Structured logging for every send/failure
+ *   - Duplicate prevention via in-memory dedup window
+ *   - Connection pooling and keepAlive for SMTP
+ *   - Timeout protection on SMTP transport
  */
 
 const provider = (process.env.EMAIL_PROVIDER || 'console').toLowerCase();
 const FROM = process.env.EMAIL_FROM || 'Confer <no-reply@confer.app>';
 
-// --- Console adapter ---------------------------------------------------------
+// ── Retry config ────────────────────────────────────────────────────────────
+const MAX_RETRIES = 3;
+const BASE_DELAY_MS = 800;        // 800ms → 1600ms → 3200ms
+const SMTP_TIMEOUT_MS = 15_000;   // 15 s per attempt
+const DEDUP_WINDOW_MS = 60_000;   // 60 s dedup window
+
+// ── Dedup cache ─────────────────────────────────────────────────────────────
+const recentSends = new Map();
+
+function dedupKey(to, subject) {
+  return `${to}::${subject}`;
+}
+
+function isDuplicate(to, subject) {
+  const key = dedupKey(to, subject);
+  const last = recentSends.get(key);
+  if (last && Date.now() - last < DEDUP_WINDOW_MS) {
+    return true;
+  }
+  recentSends.set(key, Date.now());
+  // Prune old entries periodically
+  if (recentSends.size > 500) {
+    const cutoff = Date.now() - DEDUP_WINDOW_MS;
+    for (const [k, v] of recentSends) {
+      if (v < cutoff) recentSends.delete(k);
+    }
+  }
+  return false;
+}
+
+// ── Console adapter ─────────────────────────────────────────────────────────
 const consoleAdapter = {
   async send({ to, subject, html, text }) {
     // eslint-disable-next-line no-console
@@ -31,7 +65,7 @@ const consoleAdapter = {
   },
 };
 
-// --- SMTP adapter (lazy-loaded) ----------------------------------------------
+// ── SMTP adapter (lazy-loaded, with connection pooling) ─────────────────────
 let smtpTransport = null;
 const smtpAdapter = {
   async send({ to, subject, html, text }) {
@@ -46,28 +80,100 @@ const smtpAdapter = {
           user: process.env.SMTP_USER,
           pass: process.env.SMTP_PASS,
         },
+        // Connection reliability
+        pool: true,
+        maxConnections: 3,
+        maxMessages: 50,
+        connectionTimeout: 10_000,
+        greetingTimeout: 10_000,
+        socketTimeout: SMTP_TIMEOUT_MS,
       });
+
+      // Verify transport on first creation
+      try {
+        await smtpTransport.verify();
+        // eslint-disable-next-line no-console
+        console.log('[email] SMTP transport verified successfully');
+      } catch (verifyErr) {
+        // eslint-disable-next-line no-console
+        console.warn('[email] SMTP transport verify failed:', verifyErr.message);
+        // Don't throw — we'll retry on actual send
+      }
     }
     await smtpTransport.sendMail({ from: FROM, to, subject, html, text });
   },
 };
 
-// --- Noop adapter ------------------------------------------------------------
+// ── Noop adapter ────────────────────────────────────────────────────────────
 const noopAdapter = { async send() {} };
 
-// --- Adapter selection -------------------------------------------------------
+// ── Adapter selection ───────────────────────────────────────────────────────
 const adapters = { console: consoleAdapter, smtp: smtpAdapter, noop: noopAdapter };
 const adapter = adapters[provider] || consoleAdapter;
 
 const stripHtml = (html = '') => html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
 
+// ── Sleep helper ────────────────────────────────────────────────────────────
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Send with retry + exponential backoff.
+ * Logs structured info for every attempt and failure.
+ * Prevents duplicate sends within the dedup window.
+ */
 const safeSend = async (payload) => {
-  try {
-    await adapter.send(payload);
-  } catch (err) {
+  const { to, subject } = payload;
+
+  // Guard: prevent duplicate sends within window
+  if (isDuplicate(to, subject)) {
     // eslint-disable-next-line no-console
-    console.error('[email] send failed:', err.message);
+    console.warn(`[email] DEDUP — skipping duplicate send to="${to}" subject="${subject}"`);
+    return;
   }
+
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      await adapter.send(payload);
+      // eslint-disable-next-line no-console
+      console.log(`[email] OK — to="${to}" subject="${subject}" attempt=${attempt}/${MAX_RETRIES}`);
+      return; // success — done
+    } catch (err) {
+      lastError = err;
+      // eslint-disable-next-line no-console
+      console.error(
+        `[email] FAIL — to="${to}" subject="${subject}" attempt=${attempt}/${MAX_RETRIES} error="${err.message}"`
+      );
+
+      // Reset SMTP transport on connection errors to force reconnect
+      if (
+        provider === 'smtp' &&
+        smtpTransport &&
+        (err.code === 'ECONNRESET' ||
+          err.code === 'ECONNREFUSED' ||
+          err.code === 'ETIMEDOUT' ||
+          err.code === 'ESOCKET' ||
+          err.responseCode >= 500)
+      ) {
+        try { smtpTransport.close(); } catch (_) { /* ignore */ }
+        smtpTransport = null;
+        // eslint-disable-next-line no-console
+        console.warn('[email] SMTP transport reset due to connection error');
+      }
+
+      if (attempt < MAX_RETRIES) {
+        const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1);
+        await sleep(delay);
+      }
+    }
+  }
+
+  // All retries exhausted — log final failure
+  // eslint-disable-next-line no-console
+  console.error(
+    `[email] EXHAUSTED — all ${MAX_RETRIES} attempts failed for to="${to}" subject="${subject}" lastError="${lastError?.message}"`
+  );
 };
 
 // --- Reusable wrapper -------------------------------------------------------

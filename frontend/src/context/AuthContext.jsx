@@ -1,7 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import * as authApi from '../api/auth';
 import { setStoredToken, getStoredToken } from '../api/client';
+import { disconnectSocket } from '../sockets/socket';
 
 const AuthContext = createContext(null);
 
@@ -9,6 +10,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [status, setStatus] = useState(getStoredToken() ? 'loading' : 'unauthenticated');
   const queryClient = useQueryClient();
+  const clearingSessionRef = useRef(false);
 
   // On mount, hydrate user if a token is present
   useEffect(() => {
@@ -42,9 +44,15 @@ export const AuthProvider = ({ children }) => {
   // Listen for 401 from any API call and clear session locally
   useEffect(() => {
     const onUnauthorized = () => {
+      if (clearingSessionRef.current) return;
+      clearingSessionRef.current = true;
       setUser(null);
       setStatus('unauthenticated');
       queryClient.clear();
+      disconnectSocket();
+      window.setTimeout(() => {
+        clearingSessionRef.current = false;
+      }, 500);
     };
     window.addEventListener('confer:unauthorized', onUnauthorized);
     return () => window.removeEventListener('confer:unauthorized', onUnauthorized);
@@ -80,6 +88,7 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setStatus('unauthenticated');
     queryClient.clear();
+    disconnectSocket();
   }, [queryClient]);
 
   const refreshUser = useCallback(async () => {
